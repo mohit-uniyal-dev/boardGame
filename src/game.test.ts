@@ -49,6 +49,11 @@ describe('board game rules', () => {
     expect(game.board.filter((tile) => tile.type === 'PARTY_DARE' || tile.type === 'CHOICE_TASK')).toHaveLength(12);
   });
 
+  it('uses fun default names for kids', () => {
+    const game = createGame(['', '', '', ''], 'ORIGINAL_SKETCH', false, false, 'TEST');
+    expect(game.players.map((player) => player.name)).toEqual(['Rocket', 'Bubbles', 'Sunny', 'Sparkle']);
+  });
+
   it('keeps task and mystery instructions short for kids', () => {
     expect(DARES.every((dare) => dare.description.split(/\s+/).length <= 14)).toBe(true);
     expect(MYSTERY_EFFECTS.every((effect) => effect.label.split(/\s+/).length <= 6)).toBe(true);

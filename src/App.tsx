@@ -25,7 +25,7 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import { DARES, MYSTERY_EFFECTS } from './data';
+import { DARES, MYSTERY_EFFECTS, PLAYER_NAMES } from './data';
 import { advanceTurn, canLeaveStart, chooseDare, createGame, createSeed, WIN_POINTS } from './game';
 import type { BoardTile, Dare, GameState, TileType } from './types';
 
@@ -66,12 +66,19 @@ function readSavedGame(): GameState | null {
     if (!raw) return null;
     const saved = JSON.parse(raw) as GameState;
     if (!saved.players?.length || saved.board?.length !== 34) return null;
+    const players = saved.players.map((player, index) => ({
+      ...player,
+      name: /^Player \d+$/.test(player.name) ? (PLAYER_NAMES[index] ?? player.name) : player.name,
+      points: player.points ?? 0,
+      recentDareIds: player.recentDareIds ?? [],
+    }));
+    const winner = players.find((player) => player.id === saved.winnerPlayerId);
     return {
       ...saved,
-      players: saved.players.map((player) => ({ ...player, points: player.points ?? 0, recentDareIds: player.recentDareIds ?? [] })),
+      players,
       phase: saved.winnerPlayerId ? 'GAME_OVER' : 'ROLL_PENDING',
       diceValue: null,
-      eventMessage: saved.winnerPlayerId ? saved.eventMessage : `Game loaded. ${saved.players[saved.activePlayerIndex].name}'s turn.`,
+      eventMessage: winner ? `${winner.name} wins ${WIN_POINTS.toLocaleString()} points!` : `Game loaded. ${players[saved.activePlayerIndex].name}'s turn.`,
     };
   } catch {
     return null;
@@ -182,7 +189,7 @@ function Modal({ children, onClose, label }: { children: React.ReactNode; onClos
 function SetupScreen({ onStart }: { onStart: (game: GameState) => void }) {
   const [playerCount, setPlayerCount] = useState(2);
   const startGame = () => {
-    const names = Array.from({ length: playerCount }, (_, index) => `Player ${index + 1}`);
+    const names = PLAYER_NAMES.slice(0, playerCount);
     onStart(createGame(names, 'RANDOM_PARTY', true, true));
   };
 

@@ -1,4 +1,4 @@
-import { createOriginalBoard, createRandomBoard, PLAYER_COLORS } from './data';
+import { createOriginalBoard, createRandomBoard, PLAYER_COLORS, PLAYER_NAMES } from './data';
 import type { Dare, GameMode, GameState, Player } from './types';
 
 export const WIN_POINTS = 1000;
@@ -30,7 +30,7 @@ export function chooseDare(dares: Dare[], recentDareIds: string[], preferredId?:
 export function createGame(names: string[], mode: GameMode, physicalDaresEnabled: boolean, soundEnabled: boolean, seed = createSeed()): GameState {
   const players: Player[] = names.map((name, index) => ({
     id: `player-${index + 1}-${Date.now()}`,
-    name: name.trim() || `Player ${index + 1}`,
+    name: name.trim() || PLAYER_NAMES[index] || `Player ${index + 1}`,
     color: PLAYER_COLORS[index],
     points: 0,
     recentDareIds: [],

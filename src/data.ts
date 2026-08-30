@@ -1,6 +1,7 @@
 import type { BoardTile, Dare, MysteryEffect, TileType } from './types';
 
 export const PLAYER_COLORS = ['#f25549', '#277ee8', '#f1af19', '#8a58d4'];
+export const PLAYER_NAMES = ['Rocket', 'Bubbles', 'Sunny', 'Sparkle'];
 
 export interface PathCoordinate {
   gridX: number;
