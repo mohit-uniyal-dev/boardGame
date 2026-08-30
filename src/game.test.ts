@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createRandomBoard } from './data';
-import { advanceTurn, createGame, validateBoard } from './game';
+import { createRandomBoard, DARES, MYSTERY_EFFECTS } from './data';
+import { advanceTurn, canLeaveStart, createGame, validateBoard, WIN_POINTS } from './game';
 
 describe('board game rules', () => {
   it('creates valid deterministic random boards', () => {
@@ -39,6 +39,20 @@ describe('board game rules', () => {
     const game = createGame(['A', 'B', 'C', 'D'], 'ORIGINAL_SKETCH', false, false, 'TEST');
     expect(game.players).toHaveLength(4);
     expect(game.players.every((player) => player.currentTileId === 0)).toBe(true);
+    expect(game.players.every((player) => player.points === 0)).toBe(true);
     expect(game.board.filter((tile) => tile.type === 'PARTY_DARE' || tile.type === 'CHOICE_TASK')).toHaveLength(12);
+  });
+
+  it('keeps task and mystery instructions short for kids', () => {
+    expect(DARES.every((dare) => dare.description.split(/\s+/).length <= 14)).toBe(true);
+    expect(MYSTERY_EFFECTS.every((effect) => effect.label.split(/\s+/).length <= 6)).toBe(true);
+  });
+
+  it('only allows a 1 or 6 to leave Start', () => {
+    expect([1, 2, 3, 4, 5, 6].filter(canLeaveStart)).toEqual([1, 6]);
+  });
+
+  it('awards 1,000 points for a win', () => {
+    expect(WIN_POINTS).toBe(1000);
   });
 });

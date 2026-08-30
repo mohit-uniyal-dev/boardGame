@@ -185,6 +185,7 @@ legend { margin-bottom: 9px; font-size: .78rem; color: #4d5854; font-weight: 700
 .status-alert { margin-top: 12px; padding: 10px; display: flex; align-items: center; gap: 9px; border-radius: 5px; font-size: .82rem; }
 .status-alert span { display: flex; flex-direction: column; }
 .status-alert.gate { color: #4b4d4b; background: #e7e8e5; }
+.status-alert.start { color: #174d69; background: #dff3ff; }
 .status-alert.skip { color: #87382e; background: #f8e5e0; }
 .event-log { margin-top: 22px; padding-top: 20px; display: flex; align-items: flex-start; gap: 10px; border-top: 1px solid var(--line); }
 .event-log > span { flex: 0 0 auto; width: 30px; height: 30px; display: grid; place-items: center; color: #775807; background: #f5df9c; border-radius: 50%; }
@@ -233,6 +234,10 @@ legend { margin-bottom: 9px; font-size: .78rem; color: #4d5854; font-weight: 700
 .tie-note { display: block; margin-top: 10px; color: var(--muted); }
 .victory-rays { width: 94px; height: 94px; margin: 0 auto 18px; display: grid; place-items: center; color: #7b5808; border: 3px solid #9d7616; border-radius: 50%; background: var(--yellow); box-shadow: 0 0 0 10px #f9edbd, 0 0 0 12px #dcb24d; }
 .victory-title { font-size: 2.4rem; }
+.points-award { margin: 3px auto 20px; padding: 11px 14px; display: grid; grid-template-columns: 24px 1fr; align-items: center; gap: 1px 9px; width: fit-content; color: #6a4b00; border: 1px solid #e2b832; border-radius: 6px; background: #fff2b5; text-align: left; }
+.points-award svg { grid-row: 1 / 3; color: #b77a00; }
+.points-award strong { font-size: 1rem; }
+.points-award span { font-size: .76rem; color: #806b32; }
 .tile-guide { margin: 22px 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: left; }
 .tile-guide > div { min-height: 58px; display: flex; align-items: center; gap: 9px; padding: 9px; border: 1px solid var(--line); border-radius: 5px; }
 .tile-guide svg { flex: 0 0 auto; width: 22px; color: var(--green); }

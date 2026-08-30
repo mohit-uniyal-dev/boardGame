@@ -1,8 +1,14 @@
 import { createOriginalBoard, createRandomBoard, PLAYER_COLORS } from './data';
 import type { GameMode, GameState, Player } from './types';
 
+export const WIN_POINTS = 1000;
+
 export function createSeed() {
   return Math.random().toString(36).slice(2, 8).toUpperCase();
+}
+
+export function canLeaveStart(diceValue: number) {
+  return diceValue === 1 || diceValue === 6;
 }
 
 export function createGame(names: string[], mode: GameMode, physicalDaresEnabled: boolean, soundEnabled: boolean, seed = createSeed()): GameState {
@@ -10,6 +16,7 @@ export function createGame(names: string[], mode: GameMode, physicalDaresEnabled
     id: `player-${index + 1}-${Date.now()}`,
     name: name.trim() || `Player ${index + 1}`,
     color: PLAYER_COLORS[index],
+    points: 0,
     currentTileId: 0,
     skipTurnsRemaining: 0,
     gateLock: null,

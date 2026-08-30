@@ -34,13 +34,54 @@ async function inspect(viewport, label) {
   }));
   await page.screenshot({ path: `test-results/${label}-game.png`, fullPage: true });
 
+  await page.evaluate(() => { Math.random = () => 0.5; });
   await page.getByRole('button', { name: 'Roll dice' }).click();
   const lockedDuringRoll = await page.getByRole('button', { name: /Moving|Resolving/ }).isDisabled();
-  await page.waitForTimeout(2200);
+  await page.locator('.modal').waitFor();
   const pawnPosition = await page.locator('.event-log strong').textContent();
+  const startRuleText = await page.locator('.modal').evaluate((modal) => ({
+    title: modal.querySelector('h2')?.textContent,
+    detail: modal.querySelector('.modal-detail')?.textContent,
+  }));
+  const startPawnCount = await page.locator('.tile-start .pawn').count();
+
+  await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem('blocks-and-tasks-game-v1'));
+    state.activePlayerIndex = 0;
+    state.phase = 'ROLL_PENDING';
+    state.winnerPlayerId = null;
+    state.players = state.players.map((player) => ({ ...player, currentTileId: 0, gateLock: null }));
+    state.board[6] = { ...state.board[6], type: 'MYSTERY', label: 'Mystery' };
+    localStorage.setItem('blocks-and-tasks-game-v1', JSON.stringify(state));
+  });
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.evaluate(() => { Math.random = () => 0.9; });
+  await page.getByRole('button', { name: 'Roll dice' }).click();
+  await page.locator('.modal').waitFor();
+  const kidEventText = await page.locator('.modal').evaluate((modal) => ({
+    title: modal.querySelector('h2')?.textContent,
+    detail: modal.querySelector('.modal-detail')?.textContent,
+    action: modal.querySelector('.primary-button')?.textContent?.trim(),
+  }));
+  await page.screenshot({ path: `test-results/${label}-kid-event.png`, fullPage: true });
+
+  await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem('blocks-and-tasks-game-v1'));
+    state.activePlayerIndex = 0;
+    state.phase = 'ROLL_PENDING';
+    state.winnerPlayerId = null;
+    state.players = state.players.map((player, index) => ({ ...player, points: 0, currentTileId: index === 0 ? 32 : 0, gateLock: null }));
+    localStorage.setItem('blocks-and-tasks-game-v1', JSON.stringify(state));
+  });
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.evaluate(() => { Math.random = () => 0; });
+  await page.getByRole('button', { name: 'Roll dice' }).click();
+  await page.locator('.victory-title').waitFor();
+  const winPointsText = await page.locator('.points-award').innerText();
+  await page.screenshot({ path: `test-results/${label}-victory.png`, fullPage: true });
 
   await page.close();
-  return { label, setupMetrics, gameMetrics, lockedDuringRoll, pawnPosition };
+  return { label, setupMetrics, gameMetrics, lockedDuringRoll, pawnPosition, startRuleText, startPawnCount, kidEventText, winPointsText };
 }
 
 const results = [];

@@ -17,24 +17,24 @@ export const PATH_COORDINATES = [
 ];
 
 export const DARES: Dare[] = [
-  { id: 'balance', title: 'Single-leg balance', description: 'Stand on one leg without losing balance.', durationSeconds: 20, category: 'PHYSICAL', penaltySteps: 2 },
-  { id: 'robot', title: 'Robot walk', description: 'Walk like a robot until the timer ends.', durationSeconds: 15, category: 'ACTING', penaltySteps: 2 },
-  { id: 'twister', title: 'Tongue twister', description: "Say 'Kacha Papad, Pakka Papad' five times fast.", durationSeconds: 15, category: 'VERBAL', penaltySteps: 2, rewardExtraRoll: true },
-  { id: 'freeze', title: 'Freeze pose', description: 'Hold your silliest statue pose without moving.', durationSeconds: 20, category: 'ACTING', penaltySteps: 2 },
-  { id: 'memory', title: 'Memory five', description: 'Study these: moon, spoon, kite, sock, mango. Repeat them after the timer.', durationSeconds: 15, category: 'MEMORY', penaltySteps: 2 },
-  { id: 'no-laugh', title: 'No-laugh challenge', description: 'Keep a straight face while everyone tries to make you laugh.', durationSeconds: 20, category: 'ACTING', penaltySteps: 2 },
-  { id: 'jacks', title: 'Fitness burst', description: 'Complete ten jumping jacks before time runs out.', durationSeconds: 20, category: 'PHYSICAL', penaltySteps: 2 },
-  { id: 'story', title: 'Tiny tall tale', description: 'Tell a dramatic ten-second story featuring a banana and the moon.', durationSeconds: 20, category: 'VERBAL', penaltySteps: 2 },
+  { id: 'balance', title: 'Balance', description: 'Stand on one leg.', durationSeconds: 20, category: 'PHYSICAL', penaltySteps: 2 },
+  { id: 'robot', title: 'Robot walk', description: 'Walk like a robot.', durationSeconds: 15, category: 'ACTING', penaltySteps: 2 },
+  { id: 'twister', title: 'Tongue twister', description: "Say 'Kacha Papad, Pakka Papad' 5 times fast.", durationSeconds: 15, category: 'VERBAL', penaltySteps: 2, rewardExtraRoll: true },
+  { id: 'freeze', title: 'Freeze', description: 'Hold a silly pose. Do not move.', durationSeconds: 20, category: 'ACTING', penaltySteps: 2 },
+  { id: 'memory', title: 'Remember 5', description: 'Remember: moon, spoon, kite, sock, mango. Say them when time ends.', durationSeconds: 15, category: 'MEMORY', penaltySteps: 2 },
+  { id: 'no-laugh', title: "Don't laugh", description: 'Do not laugh. Everyone else can try to make you laugh.', durationSeconds: 20, category: 'ACTING', penaltySteps: 2 },
+  { id: 'jacks', title: 'Jumping jacks', description: 'Do 10 jumping jacks.', durationSeconds: 20, category: 'PHYSICAL', penaltySteps: 2 },
+  { id: 'story', title: 'Funny story', description: 'Tell a funny story with a banana and the moon.', durationSeconds: 20, category: 'VERBAL', penaltySteps: 2 },
 ];
 
 export const MYSTERY_EFFECTS: MysteryEffect[] = [
-  { type: 'MOVE', steps: 1, label: 'A little luck! Move forward 1.' },
-  { type: 'MOVE', steps: 2, label: 'Tailwind! Move forward 2.' },
-  { type: 'MOVE', steps: 3, label: 'Big leap! Move forward 3.' },
-  { type: 'MOVE', steps: -1, label: 'Wrong turn. Move back 1.' },
-  { type: 'MOVE', steps: -2, label: 'A wobble! Move back 2.' },
-  { type: 'EXTRA_ROLL', label: 'Lucky roll! Roll once more.' },
-  { type: 'NONE', label: 'Lucky escape. Nothing happens.' },
+  { type: 'MOVE', steps: 1, label: 'Move ahead 1 space.' },
+  { type: 'MOVE', steps: 2, label: 'Move ahead 2 spaces.' },
+  { type: 'MOVE', steps: 3, label: 'Move ahead 3 spaces.' },
+  { type: 'MOVE', steps: -1, label: 'Move back 1 space.' },
+  { type: 'MOVE', steps: -2, label: 'Move back 2 spaces.' },
+  { type: 'EXTRA_ROLL', label: 'Roll again.' },
+  { type: 'NONE', label: 'You are safe. Stay here.' },
 ];
 
 const originalEvents: Record<number, Partial<BoardTile> & { type: TileType }> = {

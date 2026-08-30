@@ -39,6 +39,7 @@ export interface Player {
   id: string;
   name: string;
   color: string;
+  points: number;
   currentTileId: number;
   skipTurnsRemaining: number;
   gateLock: number[] | null;

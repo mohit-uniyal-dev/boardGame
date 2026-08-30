@@ -27,11 +27,12 @@ import {
   Zap,
 } from 'lucide-react';
 import { DARES, MYSTERY_EFFECTS } from './data';
-import { advanceTurn, createGame, createSeed } from './game';
+import { advanceTurn, canLeaveStart, createGame, createSeed, WIN_POINTS } from './game';
 import type { BoardTile, Dare, GameState, TileType } from './types';
 
 const STORAGE_KEY = 'blocks-and-tasks-game-v1';
 const DICE_ICONS = [Dice1, Dice2, Dice3, Dice4, Dice5, Dice6];
+const DARE_CATEGORY_LABELS = { PHYSICAL: 'Move', VERBAL: 'Talk', ACTING: 'Act', MEMORY: 'Remember' } as const;
 
 type Continuation = 'END_TURN' | 'BONUS_ROLL';
 type EventTone = 'good' | 'bad' | 'magic' | 'neutral';
@@ -72,9 +73,10 @@ function readSavedGame(): GameState | null {
     if (!saved.players?.length || saved.board?.length !== 34) return null;
     return {
       ...saved,
+      players: saved.players.map((player) => ({ ...player, points: player.points ?? 0 })),
       phase: saved.winnerPlayerId ? 'GAME_OVER' : 'ROLL_PENDING',
       diceValue: null,
-      eventMessage: saved.winnerPlayerId ? saved.eventMessage : `Game restored. ${saved.players[saved.activePlayerIndex].name}'s turn.`,
+      eventMessage: saved.winnerPlayerId ? saved.eventMessage : `Game loaded. ${saved.players[saved.activePlayerIndex].name}'s turn.`,
     };
   } catch {
     return null;
@@ -89,23 +91,82 @@ function getStepDuration() {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 40 : 190;
 }
 
-function playTone(enabled: boolean, tone: 'step' | 'roll' | 'good' | 'bad') {
+type SoundEffect = 'step' | 'roll' | 'good' | 'bad' | 'portal' | 'mystery' | 'tick' | 'win';
+
+let sharedAudioContext: AudioContext | null = null;
+
+function addTone(context: AudioContext, start: number, frequency: number, duration: number, volume: number, waveform: OscillatorType = 'sine', endFrequency?: number) {
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+  oscillator.type = waveform;
+  oscillator.frequency.setValueAtTime(frequency, start);
+  if (endFrequency) oscillator.frequency.exponentialRampToValueAtTime(endFrequency, start + duration);
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(volume, start + 0.012);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+  oscillator.connect(gain).connect(context.destination);
+  oscillator.start(start);
+  oscillator.stop(start + duration + 0.02);
+}
+
+function addNoise(context: AudioContext, start: number, duration: number, volume: number) {
+  const frameCount = Math.floor(context.sampleRate * duration);
+  const buffer = context.createBuffer(1, frameCount, context.sampleRate);
+  const channel = buffer.getChannelData(0);
+  for (let index = 0; index < frameCount; index += 1) channel[index] = Math.random() * 2 - 1;
+  const source = context.createBufferSource();
+  const filter = context.createBiquadFilter();
+  const gain = context.createGain();
+  source.buffer = buffer;
+  filter.type = 'bandpass';
+  filter.frequency.value = 900;
+  filter.Q.value = 0.8;
+  gain.gain.setValueAtTime(volume, start);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+  source.connect(filter).connect(gain).connect(context.destination);
+  source.start(start);
+  source.stop(start + duration);
+}
+
+function playSound(enabled: boolean, effect: SoundEffect) {
   if (!enabled) return;
   try {
     const AudioContextClass = window.AudioContext ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AudioContextClass) return;
-    const context = new AudioContextClass();
-    const oscillator = context.createOscillator();
-    const gain = context.createGain();
-    const frequencies = { step: 300, roll: 180, good: 620, bad: 130 };
-    oscillator.frequency.value = frequencies[tone];
-    oscillator.type = tone === 'bad' ? 'sawtooth' : 'sine';
-    gain.gain.setValueAtTime(0.045, context.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.09);
-    oscillator.connect(gain).connect(context.destination);
-    oscillator.start();
-    oscillator.stop(context.currentTime + 0.1);
-    oscillator.addEventListener('ended', () => void context.close());
+    sharedAudioContext ??= new AudioContextClass();
+    const context = sharedAudioContext;
+    if (context.state === 'suspended') void context.resume();
+    const now = context.currentTime + 0.015;
+
+    switch (effect) {
+      case 'step':
+        addTone(context, now, 360, 0.07, 0.05, 'square', 300);
+        break;
+      case 'roll':
+        addNoise(context, now, 0.38, 0.13);
+        [0, 0.09, 0.18, 0.27].forEach((delay, index) => addTone(context, now + delay, 180 + index * 45, 0.055, 0.055, 'square'));
+        break;
+      case 'good':
+        [523, 659, 784].forEach((frequency, index) => addTone(context, now + index * 0.09, frequency, 0.18, 0.075, 'triangle'));
+        break;
+      case 'bad':
+        addTone(context, now, 330, 0.2, 0.075, 'sawtooth', 210);
+        addTone(context, now + 0.16, 190, 0.22, 0.065, 'sawtooth', 125);
+        break;
+      case 'portal':
+        addTone(context, now, 180, 0.48, 0.065, 'sine', 960);
+        addTone(context, now + 0.08, 260, 0.42, 0.04, 'triangle', 1320);
+        break;
+      case 'mystery':
+        [740, 988, 1319, 988].forEach((frequency, index) => addTone(context, now + index * 0.075, frequency, 0.18, 0.055, 'sine'));
+        break;
+      case 'tick':
+        addTone(context, now, 880, 0.075, 0.055, 'square');
+        break;
+      case 'win':
+        [523, 659, 784, 1047].forEach((frequency, index) => addTone(context, now + index * 0.13, frequency, index === 3 ? 0.48 : 0.24, 0.085, 'triangle'));
+        break;
+    }
   } catch {
     // Audio feedback is optional; visual feedback remains available.
   }
@@ -227,6 +288,7 @@ function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMai
       setDareState((current) => current ? { ...current, stage: 'vote' } : null);
       return;
     }
+    if (dareState.secondsLeft <= 5) playSound(gameRef.current.settings.soundEnabled, 'tick');
     const timer = window.setTimeout(() => setDareState((current) => current ? { ...current, secondsLeft: current.secondsLeft - 1 } : null), 1000);
     return () => window.clearTimeout(timer);
   }, [dareState]);
@@ -244,13 +306,13 @@ function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMai
   const declareWinner = (position: number, message?: string) => {
     const current = gameRef.current;
     const player = current.players[current.activePlayerIndex];
-    playTone(current.settings.soundEnabled, 'good');
+    playSound(current.settings.soundEnabled, 'win');
     setGame((state) => ({
       ...state,
-      players: state.players.map((item, index) => index === state.activePlayerIndex ? { ...item, currentTileId: Math.min(33, position) } : item),
+      players: state.players.map((item, index) => index === state.activePlayerIndex ? { ...item, currentTileId: Math.min(33, position), points: item.points + WIN_POINTS } : item),
       winnerPlayerId: player.id,
       phase: 'GAME_OVER',
-      eventMessage: message ?? `${player.name} reached the finish!`,
+      eventMessage: message ?? `${player.name} wins ${WIN_POINTS.toLocaleString()} points!`,
     }));
   };
 
@@ -261,8 +323,8 @@ function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMai
     }));
   };
 
-  const showEvent = (title: string, detail: string, tone: EventTone, continuation: Continuation) => {
-    playTone(gameRef.current.settings.soundEnabled, tone === 'bad' ? 'bad' : tone === 'neutral' ? 'step' : 'good');
+  const showEvent = (title: string, detail: string, tone: EventTone, continuation: Continuation, sound?: SoundEffect) => {
+    playSound(gameRef.current.settings.soundEnabled, sound ?? (tone === 'bad' ? 'bad' : tone === 'magic' ? 'mystery' : tone === 'neutral' ? 'step' : 'good'));
     setGame((current) => ({ ...current, phase: 'RESOLVING_EVENT', eventMessage: detail }));
     setEventDialog({ title, detail, tone, continuation });
   };
@@ -272,7 +334,7 @@ function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMai
     setEventDialog(null);
     if (!event) return;
     if (event.continuation === 'BONUS_ROLL') {
-      setGame((current) => ({ ...current, phase: 'ROLL_PENDING', diceValue: null, bonusRollsUsedThisTurn: current.bonusRollsUsedThisTurn + 1, eventMessage: `${current.players[current.activePlayerIndex].name} gets another roll.` }));
+      setGame((current) => ({ ...current, phase: 'ROLL_PENDING', diceValue: null, bonusRollsUsedThisTurn: current.bonusRollsUsedThisTurn + 1, eventMessage: `${current.players[current.activePlayerIndex].name} rolls again.` }));
     } else {
       endTurn();
     }
@@ -287,7 +349,7 @@ function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMai
   const beginDare = (tile: BoardTile) => {
     setChoiceActive(false);
     const dare = pickDare(tile);
-    setGame((current) => ({ ...current, phase: 'DARE_ACTIVE', eventMessage: `${current.players[current.activePlayerIndex].name} drew: ${dare.title}.` }));
+    setGame((current) => ({ ...current, phase: 'DARE_ACTIVE', eventMessage: `${current.players[current.activePlayerIndex].name}'s task: ${dare.title}.` }));
     setDareState({ dare, stage: 'intro', secondsLeft: dare.durationSeconds, votes: {} });
   };
 
@@ -303,51 +365,51 @@ function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMai
         break;
       case 'SHORTCUT_TUNNEL': {
         const target = tile.targetTileId ?? tile.id;
-        if (target >= 33) return declareWinner(target, `${player.name} took the tunnel straight to victory!`);
+        if (target >= 33) return declareWinner(target, `${player.name} wins!`);
         moveCurrentPlayer(target);
-        showEvent('Shortcut tunnel!', `${player.name} slides ahead to tile ${target}.`, 'good', 'END_TURN');
+        showEvent('Tunnel!', `Go to tile ${target}.`, 'good', 'END_TURN');
         break;
       }
       case 'PORTAL': {
         const target = tile.targetTileId ?? tile.id;
-        if (target >= 33) return declareWinner(target, `${player.name} warped to the finish!`);
+        if (target >= 33) return declareWinner(target, `${player.name} wins!`);
         moveCurrentPlayer(target);
-        showEvent('Portal opened', `${player.name} reappears on tile ${target}.`, 'magic', 'END_TURN');
+        showEvent('Portal!', `Go to tile ${target}.`, 'magic', 'END_TURN', 'portal');
         break;
       }
       case 'MYSTERY': {
         const effect = MYSTERY_EFFECTS[Math.floor(Math.random() * MYSTERY_EFFECTS.length)];
         if (effect.type === 'MOVE') {
           const target = Math.max(0, player.currentTileId + (effect.steps ?? 0));
-          if (target >= 33) return declareWinner(target, `${effect.label} ${player.name} wins!`);
+          if (target >= 33) return declareWinner(target, `${player.name} wins!`);
           moveCurrentPlayer(target);
         }
         const grantsRoll = effect.type === 'EXTRA_ROLL' && bonusAvailable;
-        showEvent('Mystery revealed', grantsRoll ? effect.label : effect.type === 'EXTRA_ROLL' ? 'The bonus-roll limit has been reached.' : effect.label, 'magic', grantsRoll ? 'BONUS_ROLL' : 'END_TURN');
+        showEvent('Mystery!', grantsRoll ? effect.label : effect.type === 'EXTRA_ROLL' ? 'No more extra rolls.' : effect.label, 'magic', grantsRoll ? 'BONUS_ROLL' : 'END_TURN', 'mystery');
         break;
       }
       case 'EXTRA_ROLL':
-        showEvent('Roll again', bonusAvailable ? `${player.name} earns another roll.` : 'The bonus-roll limit has been reached.', 'good', bonusAvailable ? 'BONUS_ROLL' : 'END_TURN');
+        showEvent('Roll again!', bonusAvailable ? 'You get one more roll.' : 'No more extra rolls.', 'good', bonusAvailable ? 'BONUS_ROLL' : 'END_TURN');
         break;
       case 'PENALTY_SKIP':
         setGame((state) => ({ ...state, players: state.players.map((item, index) => index === state.activePlayerIndex ? { ...item, skipTurnsRemaining: Math.min(2, item.skipTurnsRemaining + 1) } : item) }));
-        showEvent('Frozen turn', `${player.name} will skip their next turn.`, 'bad', 'END_TURN');
+        showEvent('Miss a turn', 'Miss your next turn.', 'bad', 'END_TURN');
         break;
       case 'PENALTY_RESET':
         moveCurrentPlayer(0);
-        showEvent('Back to start', `${player.name} is sent all the way home.`, 'bad', 'END_TURN');
+        showEvent('Back to Start', 'Go back to Start.', 'bad', 'END_TURN');
         break;
       case 'GATE_RESTRICTION': {
         const allowed = tile.allowedDice ?? [1, 2];
         setGame((state) => ({ ...state, players: state.players.map((item, index) => index === state.activePlayerIndex ? { ...item, gateLock: allowed } : item) }));
-        showEvent('The gate is locked', `Next turn, ${player.name} needs a ${allowed.join(' or ')} to escape.`, 'bad', 'END_TURN');
+        showEvent('Blocked!', `Next turn, roll ${allowed.join(' or ')} to move.`, 'bad', 'END_TURN');
         break;
       }
       case 'PARTY_DARE':
         beginDare(tile);
         break;
       case 'CHOICE_TASK':
-        setGame((state) => ({ ...state, phase: 'RESOLVING_EVENT', eventMessage: `${player.name} must choose a challenge or step back.` }));
+        setGame((state) => ({ ...state, phase: 'RESOLVING_EVENT', eventMessage: `${player.name} must choose.` }));
         setChoiceActive(true);
         break;
       case 'FINISH':
@@ -360,7 +422,7 @@ function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMai
     const snapshot = gameRef.current;
     if (snapshot.phase !== 'ROLL_PENDING') return;
     setGame((current) => ({ ...current, phase: 'MOVING', eventMessage: `${current.players[current.activePlayerIndex].name} is rolling...` }));
-    playTone(snapshot.settings.soundEnabled, 'roll');
+    playSound(snapshot.settings.soundEnabled, 'roll');
 
     for (let spin = 0; spin < 7; spin += 1) {
       setRollingValue(1 + Math.floor(Math.random() * 6));
@@ -374,19 +436,23 @@ function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMai
 
     const afterRoll = gameRef.current;
     const roller = afterRoll.players[afterRoll.activePlayerIndex];
+    if (roller.currentTileId === 0 && !canLeaveStart(value)) {
+      showEvent('Stay at Start', 'Roll 1 or 6 to move.', 'neutral', 'END_TURN');
+      return;
+    }
     if (roller.gateLock) {
       if (!roller.gateLock.includes(value)) {
-        showEvent('Gate stays shut', `${roller.name} rolled ${value}. They need ${roller.gateLock.join(' or ')}.`, 'bad', 'END_TURN');
+        showEvent('Still blocked', `You rolled ${value}. You need ${roller.gateLock.join(' or ')}.`, 'bad', 'END_TURN');
         return;
       }
-      setGame((current) => ({ ...current, players: current.players.map((player, index) => index === current.activePlayerIndex ? { ...player, gateLock: null } : player), eventMessage: `${roller.name} unlocked the gate with a ${value}!` }));
+      setGame((current) => ({ ...current, players: current.players.map((player, index) => index === current.activePlayerIndex ? { ...player, gateLock: null } : player), eventMessage: `${roller.name} is free!` }));
     }
 
     const start = roller.currentTileId;
     const destination = Math.min(33, start + value);
     for (let position = start + 1; position <= destination; position += 1) {
       moveCurrentPlayer(position);
-      playTone(snapshot.settings.soundEnabled, 'step');
+      playSound(snapshot.settings.soundEnabled, 'step');
       await sleep(getStepDuration());
     }
     if (destination >= 33) {
@@ -404,8 +470,8 @@ function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMai
     if (!passed) moveCurrentPlayer(player.currentTileId - dareState.dare.penaltySteps);
     setDareState(null);
     showEvent(
-      passed ? 'Challenge passed!' : 'Challenge missed',
-      passed ? `${player.name} nailed it${grantsRoll ? ' and earned another roll.' : '.'}` : `${player.name} moves back ${dareState.dare.penaltySteps} spaces.`,
+      passed ? 'You did it!' : 'Try again!',
+      passed ? (grantsRoll ? 'Great job! Roll again.' : 'Great job!') : `Move back ${dareState.dare.penaltySteps} spaces.`,
       passed ? 'good' : 'bad',
       grantsRoll ? 'BONUS_ROLL' : 'END_TURN',
     );
@@ -423,9 +489,11 @@ function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMai
   const rematch = (sameBoard: boolean) => {
     const names = game.players.map((player) => player.name);
     const seed = sameBoard ? game.seed : createSeed();
+    const nextGame = createGame(names, game.settings.mode, game.settings.physicalDaresEnabled, game.settings.soundEnabled, seed);
+    nextGame.players = nextGame.players.map((player, index) => ({ ...player, points: game.players[index].points }));
     setEventDialog(null);
     setDareState(null);
-    setGame(createGame(names, game.settings.mode, game.settings.physicalDaresEnabled, game.settings.soundEnabled, seed));
+    setGame(nextGame);
   };
 
   const winner = game.players.find((player) => player.id === game.winnerPlayerId);
@@ -461,12 +529,13 @@ function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMai
             <Dice6 size={21} /> {game.phase === 'ROLL_PENDING' ? 'Roll dice' : game.phase === 'MOVING' ? 'Moving...' : 'Resolving...' }
           </button>
 
-          {activePlayer.gateLock && <div className="status-alert gate"><LockKeyhole size={18} /><span><strong>Gate locked</strong>Roll {activePlayer.gateLock.join(' or ')} to move</span></div>}
-          {activePlayer.skipTurnsRemaining > 0 && <div className="status-alert skip"><Pause size={18} /><span><strong>Turn penalty</strong>Skip {activePlayer.skipTurnsRemaining} turn</span></div>}
+          {activePlayer.gateLock && <div className="status-alert gate"><LockKeyhole size={18} /><span><strong>Blocked</strong>Roll {activePlayer.gateLock.join(' or ')} to move</span></div>}
+          {activePlayer.currentTileId === 0 && <div className="status-alert start"><Flag size={18} /><span><strong>At Start</strong>Roll 1 or 6 to move</span></div>}
+          {activePlayer.skipTurnsRemaining > 0 && <div className="status-alert skip"><Pause size={18} /><span><strong>Miss a turn</strong>{activePlayer.skipTurnsRemaining} left</span></div>}
 
           <div className="event-log" aria-live="polite">
             <span><Zap size={16} /></span>
-            <div><p>Latest event</p><strong>{game.eventMessage}</strong></div>
+            <div><p>What happened</p><strong>{game.eventMessage}</strong></div>
           </div>
         </aside>
       </section>
@@ -474,62 +543,60 @@ function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMai
       {eventDialog && (
         <Modal label={eventDialog.title}>
           <div className={`event-emblem ${eventDialog.tone}`}>{eventDialog.tone === 'bad' ? <RotateCcw size={30} /> : eventDialog.tone === 'magic' ? <Sparkles size={30} /> : <Star size={30} />}</div>
-          <p className="modal-kicker">Board event</p>
           <h2>{eventDialog.title}</h2>
           <p className="modal-detail">{eventDialog.detail}</p>
-          <button className="primary-button" onClick={dismissEvent}>{eventDialog.continuation === 'BONUS_ROLL' ? 'Roll again' : 'Continue'}</button>
+          <button className="primary-button" onClick={dismissEvent}>{eventDialog.continuation === 'BONUS_ROLL' ? 'Roll' : 'OK'}</button>
         </Modal>
       )}
 
       {choiceActive && (
         <Modal label="Choose your task">
           <div className="event-emblem magic"><Shuffle size={30} /></div>
-          <p className="modal-kicker">Your choice</p>
-          <h2>Brave the task?</h2>
-          <p className="modal-detail">Take a party challenge, or retreat two spaces.</p>
+          <h2>Choose one</h2>
+          <p className="modal-detail">Do a task, or move back 2 spaces.</p>
           <div className="choice-actions">
-            <button className="primary-button" onClick={() => beginDare(game.board[activePlayer.currentTileId])}><Star size={18} /> Take the task</button>
-            <button className="secondary-button" onClick={() => { setChoiceActive(false); moveCurrentPlayer(activePlayer.currentTileId - 2); showEvent('A careful retreat', `${activePlayer.name} moves back 2 spaces.`, 'neutral', 'END_TURN'); }}><ArrowLeft size={18} /> Move back 2</button>
+            <button className="primary-button" onClick={() => beginDare(game.board[activePlayer.currentTileId])}><Star size={18} /> Do a task</button>
+            <button className="secondary-button" onClick={() => { setChoiceActive(false); moveCurrentPlayer(activePlayer.currentTileId - 2); showEvent('Move back', 'Move back 2 spaces.', 'neutral', 'END_TURN'); }}><ArrowLeft size={18} /> Move back 2</button>
           </div>
         </Modal>
       )}
 
       {dareState && (
         <Modal label={dareState.dare.title}>
-          <div className="dare-topline"><span className={`category category-${dareState.dare.category.toLowerCase()}`}>{dareState.dare.category}</span><span>{dareState.dare.durationSeconds} seconds</span></div>
+          <div className="dare-topline"><span className={`category category-${dareState.dare.category.toLowerCase()}`}>{DARE_CATEGORY_LABELS[dareState.dare.category]}</span><span>{dareState.dare.durationSeconds} sec</span></div>
           <div className="event-emblem good"><Star size={30} /></div>
-          <p className="modal-kicker">Party task for {activePlayer.name}</p>
+          <p className="modal-kicker">{activePlayer.name}'s task</p>
           <h2>{dareState.dare.title}</h2>
           <p className="modal-detail dare-detail">{dareState.dare.description}</p>
 
           {dareState.stage === 'intro' && (
             <div className="dare-actions">
-              <button className="primary-button" onClick={() => setDareState((current) => current ? { ...current, stage: 'timer' } : null)}><Play size={18} fill="currentColor" /> Start challenge</button>
-              <button className="text-button danger-text" onClick={() => resolveDare(false)}>Skip this dare</button>
+              <button className="primary-button" onClick={() => setDareState((current) => current ? { ...current, stage: 'timer' } : null)}><Play size={18} fill="currentColor" /> Start</button>
+              <button className="text-button danger-text" onClick={() => resolveDare(false)}>Skip task</button>
             </div>
           )}
           {dareState.stage === 'timer' && (
             <div className="timer-panel">
               <div className="timer-value">{dareState.secondsLeft}</div>
               <div className="timer-track"><span style={{ width: `${(dareState.secondsLeft / dareState.dare.durationSeconds) * 100}%` }} /></div>
-              <button className="secondary-button" onClick={() => setDareState((current) => current ? { ...current, stage: 'vote' } : null)}>Ready to vote</button>
+              <button className="secondary-button" onClick={() => setDareState((current) => current ? { ...current, stage: 'vote' } : null)}>Done</button>
             </div>
           )}
           {dareState.stage === 'vote' && (
             <div className="vote-panel">
-              <p className="vote-title">Opponents: cast your votes</p>
+              <p className="vote-title">Did they do it?</p>
               {game.players.map((player, index) => index === game.activePlayerIndex ? null : (
                 <div className="voter-row" key={player.id}>
                   <span className="mini-pawn" style={{ '--pawn-color': player.color } as React.CSSProperties} />
                   <strong>{player.name}</strong>
                   <div className="vote-buttons">
-                    <button className={dareState.votes[player.id] === true ? 'pass selected' : 'pass'} onClick={() => setDareState((current) => current ? { ...current, votes: { ...current.votes, [player.id]: true } } : null)}><Check size={16} /> Pass</button>
-                    <button className={dareState.votes[player.id] === false ? 'fail selected' : 'fail'} onClick={() => setDareState((current) => current ? { ...current, votes: { ...current.votes, [player.id]: false } } : null)}><X size={16} /> Fail</button>
+                    <button className={dareState.votes[player.id] === true ? 'pass selected' : 'pass'} onClick={() => setDareState((current) => current ? { ...current, votes: { ...current.votes, [player.id]: true } } : null)}><Check size={16} /> Yes</button>
+                    <button className={dareState.votes[player.id] === false ? 'fail selected' : 'fail'} onClick={() => setDareState((current) => current ? { ...current, votes: { ...current.votes, [player.id]: false } } : null)}><X size={16} /> No</button>
                   </div>
                 </div>
               ))}
-              <button className="primary-button" disabled={game.players.some((player, index) => index !== game.activePlayerIndex && dareState.votes[player.id] === undefined)} onClick={submitVotes}>Resolve votes</button>
-              <small className="tie-note">A tied vote counts as a pass.</small>
+              <button className="primary-button" disabled={game.players.some((player, index) => index !== game.activePlayerIndex && dareState.votes[player.id] === undefined)} onClick={submitVotes}>See result</button>
+              <small className="tie-note">A tie means yes.</small>
             </div>
           )}
         </Modal>
@@ -538,9 +605,10 @@ function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMai
       {winner && (
         <Modal label={`${winner.name} wins`}>
           <div className="victory-rays"><Trophy size={54} /></div>
-          <p className="modal-kicker">Finish line reached</p>
+          <p className="modal-kicker">Game over</p>
           <h2 className="victory-title">{winner.name} wins!</h2>
-          <p className="modal-detail">The race wrapped up in {game.turnNumber} turns.</p>
+          <div className="points-award"><Sparkles size={22} /><strong>+{WIN_POINTS.toLocaleString()} points</strong><span>Total: {winner.points.toLocaleString()}</span></div>
+          <p className="modal-detail">You finished in {game.turnNumber} turns.</p>
           <div className="victory-actions">
             <button className="primary-button" onClick={() => rematch(true)}><RotateCcw size={18} /> Same board</button>
             <button className="secondary-button" onClick={() => rematch(false)}><Shuffle size={18} /> New board</button>
@@ -554,12 +622,12 @@ function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMai
           <p className="modal-kicker">Tile guide</p>
           <h2>Know the path</h2>
           <div className="tile-guide">
-            <div><DoorOpen /><span><strong>Tunnel</strong>Shortcut forward</span></div>
-            <div><Sparkles /><span><strong>Portal</strong>Warp elsewhere</span></div>
-            <div><LockKeyhole /><span><strong>Block</strong>Roll 1 or 2 to leave</span></div>
-            <div><Star /><span><strong>Task</strong>Take a party challenge</span></div>
-            <div><CircleHelp /><span><strong>Mystery</strong>Draw a surprise effect</span></div>
-            <div><Home /><span><strong>Reset</strong>Return to the start</span></div>
+            <div><DoorOpen /><span><strong>Tunnel</strong>Move ahead</span></div>
+            <div><Sparkles /><span><strong>Portal</strong>Go to a new tile</span></div>
+            <div><LockKeyhole /><span><strong>Block</strong>Roll 1 or 2</span></div>
+            <div><Star /><span><strong>Task</strong>Do a fun task</span></div>
+            <div><CircleHelp /><span><strong>Mystery</strong>Get a surprise</span></div>
+            <div><Home /><span><strong>Back to Start</strong>Go to Start</span></div>
           </div>
           <button className="primary-button" onClick={() => setShowRules(false)}>Back to game</button>
         </Modal>

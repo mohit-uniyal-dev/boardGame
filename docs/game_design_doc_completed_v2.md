@@ -39,6 +39,7 @@ Some handwritten task text in the sketch is not fully legible. Those specific ta
    - Players take turns rolling one standard six-sided die (`1–6`).
    - Only the active player can roll.
    - Dice input is disabled while movement or an event animation is resolving.
+   - A pawn on `START` can leave only after rolling `1` or `6`. The valid roll is then used for normal movement.
 
 3. **Pawn Movement**
    - A pawn moves one tile at a time according to the dice result.
@@ -53,6 +54,7 @@ Some handwritten task text in the sketch is not fully legible. Those specific ta
 5. **Winning**
    - A player wins as soon as their position reaches or exceeds the `FINISH` tile.
    - **Exact roll is not required** in the MVP.
+   - The winner earns **1,000 points**. Totals continue across rematches and reset from the home screen.
    - Once a winner is declared, all gameplay controls are disabled and the Victory screen appears.
 
 6. **Shared Tile Rule**
