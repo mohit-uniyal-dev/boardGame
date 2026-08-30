@@ -220,6 +220,8 @@ function SetupScreen({ onStart }: { onStart: (game: GameState) => void }) {
 }
 
 function Board({ game }: { game: GameState }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const activeTileId = game.players[game.activePlayerIndex]?.currentTileId ?? 0;
   const tileCenter = (tile: BoardTile) => ({ x: tile.gridX * 100 + 50, y: tile.gridY * 100 + 50 });
   const points = game.board.map((tile) => {
     const center = tileCenter(tile);
@@ -227,8 +229,20 @@ function Board({ game }: { game: GameState }) {
   }).join(' ');
   const transports = game.board.filter((tile) => (tile.type === 'PORTAL' || tile.type === 'SHORTCUT_TUNNEL') && tile.targetTileId !== undefined);
 
+  useEffect(() => {
+    const scroll = scrollRef.current;
+    const tile = scroll?.querySelector<HTMLElement>(`[data-tile-id="${activeTileId}"]`);
+    if (!scroll || !tile) return;
+
+    const target = tile.offsetLeft + tile.offsetWidth / 2 - scroll.clientWidth / 2;
+    scroll.scrollTo({
+      left: Math.max(0, target),
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    });
+  }, [activeTileId, game.activePlayerIndex]);
+
   return (
-    <div className="board-scroll">
+    <div className="board-scroll" ref={scrollRef}>
       <div className="board" aria-label="Game board with 34 path tiles">
         <svg className="board-routes" viewBox="0 0 1000 600" aria-hidden="true">
           <polyline className="path-line-shadow" points={points} />
@@ -248,6 +262,7 @@ function Board({ game }: { game: GameState }) {
             <div
               className={`tile tile-${tile.type.toLowerCase()} tile-color-${tile.id % 5}`}
               style={{ gridColumn: tile.gridX + 1, gridRow: tile.gridY + 1 } as React.CSSProperties}
+              data-tile-id={tile.id}
               key={tile.id}
               aria-label={`Tile ${tile.id}: ${tile.label}`}
             >
@@ -585,6 +600,10 @@ function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMai
 
 export default function App() {
   const [activeGame, setActiveGame] = useState<GameState | null>(() => readSavedGame());
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [activeGame?.id]);
 
   const startGame = (game: GameState) => {
     localStorage.removeItem(STORAGE_KEY);

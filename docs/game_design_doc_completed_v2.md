@@ -66,6 +66,7 @@ Some handwritten task text in the sketch is not fully legible. Those specific ta
 ## 3. Recommended Game Modes
 
 ### 3.1 Original Sketch Mode
+
 A fixed board intended to preserve the nephew's original concept.
 
 - Board geometry is fixed.
@@ -73,6 +74,7 @@ A fixed board intended to preserve the nephew's original concept.
 - Useful as the canonical/default board.
 
 ### 3.2 Random Party Mode
+
 The path geometry and eligible special events are generated at match creation.
 
 - Creates a connected 34-block route with a different shape for each seed.

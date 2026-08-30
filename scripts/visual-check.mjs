@@ -5,12 +5,13 @@ const browser = await chromium.launch({
   executablePath: 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
   headless: true,
 });
+const baseUrl = process.env.BASE_URL ?? 'http://localhost:5173/boardGame/';
 
 await mkdir('test-results', { recursive: true });
 
 async function inspect(viewport, label) {
   const page = await browser.newPage({ viewport });
-  await page.goto('http://127.0.0.1:5173', { waitUntil: 'networkidle' });
+  await page.goto(baseUrl, { waitUntil: 'networkidle' });
   await page.screenshot({ path: `test-results/${label}-setup.png`, fullPage: true });
 
   const setupMetrics = await page.evaluate(() => ({
