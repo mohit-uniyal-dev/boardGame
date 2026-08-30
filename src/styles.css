@@ -139,7 +139,7 @@ legend { margin-bottom: 9px; font-size: .78rem; color: #4d5854; font-weight: 700
 .tile { position: relative; z-index: 2; width: 70%; aspect-ratio: 1; align-self: center; justify-self: center; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #33403c; border: 2px solid #65706b; border-radius: 6px; background: #fffdf7; box-shadow: 2px 3px 0 rgba(48,55,50,.22); }
 .tile svg { flex: 0 0 auto; }
 .tile-number { position: absolute; top: 4px; left: 6px; color: #68716c; font-size: clamp(.58rem, .75vw, .72rem); font-weight: 800; }
-.tile-label { width: 90%; margin-top: 2px; overflow: hidden; color: currentColor; font-size: clamp(.5rem, .67vw, .66rem); line-height: 1.05; font-weight: 800; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.tile-label { width: 92%; min-height: 2.1em; margin-top: 2px; display: grid; place-items: center; color: currentColor; font-size: clamp(.48rem, .64vw, .64rem); line-height: 1.05; font-weight: 800; overflow-wrap: anywhere; text-align: center; }
 .tile-start, .tile-finish { width: 82%; color: #fff; border-color: var(--ink); }
 .tile-start { background: var(--green); }
 .tile-finish { background: #e2a91c; }

@@ -92,22 +92,29 @@ export function createRandomBoard(seed: string): BoardTile[] {
   const board = createBaseBoard();
   const available = Array.from({ length: 27 }, (_, index) => index + 4);
   const take = () => available.splice(Math.floor(random() * available.length), 1)[0];
+  const takeWhere = (predicate: (id: number) => boolean) => {
+    const candidates = available.filter(predicate);
+    const selected = candidates[Math.floor(random() * candidates.length)];
+    available.splice(available.indexOf(selected), 1);
+    return selected;
+  };
   const set = (id: number, patch: Partial<BoardTile>) => Object.assign(board[id], patch);
 
   const tunnel = take();
   set(tunnel, { type: 'SHORTCUT_TUNNEL', label: 'Tunnel', targetTileId: Math.min(32, tunnel + 5 + Math.floor(random() * 5)) });
   const portal = take();
-  const portalTarget = portal < 20 ? Math.min(32, portal + 4 + Math.floor(random() * 6)) : Math.max(4, portal - 5);
+  let portalTarget = portal < 20 ? Math.min(32, portal + 4 + Math.floor(random() * 6)) : Math.max(4, portal - 5);
+  if (board[tunnel].targetTileId === portal && portalTarget === tunnel) portalTarget = Math.min(32, portal + 3);
   set(portal, { type: 'PORTAL', label: 'Portal', targetTileId: portalTarget });
   set(take(), { type: 'MYSTERY', label: 'Mystery' });
   set(take(), { type: 'MYSTERY', label: 'Mystery' });
   set(take(), { type: 'EXTRA_ROLL', label: 'Roll again' });
-  set(take(), { type: 'PENALTY_SKIP', label: 'Skip a turn' });
-  set(take(), { type: 'GATE_RESTRICTION', label: 'Block', allowedDice: [1, 2] });
+  const skip = take();
+  set(skip, { type: 'PENALTY_SKIP', label: 'Skip a turn' });
+  const gate = takeWhere((id) => Math.abs(id - skip) > 1);
+  set(gate, { type: 'GATE_RESTRICTION', label: 'Block', allowedDice: [1, 2] });
 
-  const resetCandidates = available.filter((id) => id <= 27);
-  const reset = resetCandidates[Math.floor(random() * resetCandidates.length)];
-  available.splice(available.indexOf(reset), 1);
+  const reset = takeWhere((id) => id <= 27 && Math.abs(id - skip) > 1 && Math.abs(id - gate) > 1);
   set(reset, { type: 'PENALTY_RESET', label: 'Back to start' });
 
   for (let count = 0; count < 4; count += 1) {

@@ -10,6 +10,21 @@ describe('board game rules', () => {
     expect(validateBoard({ board: first })).toBe(true);
     expect(first.slice(1, 4).every((tile) => tile.type === 'NORMAL')).toBe(true);
     expect(first.filter((tile) => tile.type === 'PENALTY_RESET')).toHaveLength(1);
+    expect(first.slice(31, 33).every((tile) => tile.type === 'NORMAL')).toBe(true);
+    const majorNegativeIds = first.filter((tile) => ['PENALTY_SKIP', 'PENALTY_RESET', 'GATE_RESTRICTION'].includes(tile.type)).map((tile) => tile.id);
+    expect(majorNegativeIds.every((id) => majorNegativeIds.every((other) => id === other || Math.abs(id - other) > 1))).toBe(true);
+  });
+
+  it('keeps 100 generated boards within the fairness constraints', () => {
+    for (let index = 0; index < 100; index += 1) {
+      const board = createRandomBoard(`BOARD-${index}`);
+      expect(validateBoard({ board })).toBe(true);
+      const majorNegativeIds = board.filter((tile) => ['PENALTY_SKIP', 'PENALTY_RESET', 'GATE_RESTRICTION'].includes(tile.type)).map((tile) => tile.id);
+      expect(majorNegativeIds.every((id) => majorNegativeIds.every((other) => id === other || Math.abs(id - other) > 1))).toBe(true);
+      expect(board.filter((tile) => tile.type === 'SHORTCUT_TUNNEL')).toHaveLength(1);
+      expect(board.filter((tile) => tile.type === 'PARTY_DARE' || tile.type === 'CHOICE_TASK')).toHaveLength(4);
+      expect(board.filter((tile) => tile.type === 'MYSTERY')).toHaveLength(2);
+    }
   });
 
   it('decrements skipped turns and selects the next available player', () => {
