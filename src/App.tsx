@@ -13,10 +13,14 @@ import {
   Footprints,
   Home,
   LockKeyhole,
+  Maximize,
+  Minimize,
   Pause,
   Play,
   RotateCcw,
+  RotateCw,
   Shuffle,
+  Smartphone,
   Sparkles,
   Star,
   Trophy,
@@ -31,6 +35,10 @@ import type { BoardTile, Dare, GameState, TileType } from './types';
 
 const STORAGE_KEY = 'blocks-and-tasks-game-v1';
 const DICE_ICONS = [Dice1, Dice2, Dice3, Dice4, Dice5, Dice6];
+// Phones held sideways: the header is dropped and every control moves into the side rail.
+const COMPACT_QUERY = '(orientation: landscape) and (max-height: 560px) and (max-width: 1180px)';
+// Touch devices held upright: the board only fits when the phone is turned.
+const PORTRAIT_QUERY = '(orientation: portrait) and (pointer: coarse) and (hover: none)';
 
 type Continuation = 'END_TURN' | 'BONUS_ROLL';
 type EventTone = 'good' | 'bad' | 'magic' | 'neutral';
@@ -91,6 +99,67 @@ function sleep(milliseconds: number) {
 
 function getStepDuration() {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 40 : 190;
+}
+
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const list = window.matchMedia(query);
+    const update = () => setMatches(list.matches);
+    update();
+    list.addEventListener('change', update);
+    return () => list.removeEventListener('change', update);
+  }, [query]);
+  return matches;
+}
+
+async function lockLandscape() {
+  try {
+    const orientation = window.screen?.orientation as (ScreenOrientation & { lock?: (value: string) => Promise<void> }) | undefined;
+    await orientation?.lock?.('landscape');
+  } catch {
+    // Orientation locking needs fullscreen and is unavailable on iOS; the rotate prompt covers it.
+  }
+}
+
+function useFullscreen() {
+  const supported = typeof document !== 'undefined' && Boolean(document.fullscreenEnabled);
+  const [isFullscreen, setIsFullscreen] = useState(() => Boolean(document.fullscreenElement));
+
+  useEffect(() => {
+    const update = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', update);
+    return () => document.removeEventListener('fullscreenchange', update);
+  }, []);
+
+  const toggle = async () => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        return;
+      }
+      await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+      await lockLandscape();
+    } catch {
+      // Fullscreen is an enhancement; the game stays playable in the normal browser view.
+    }
+  };
+
+  return { supported, isFullscreen, toggle };
+}
+
+function RotateGate({ onDismiss }: { onDismiss: () => void }) {
+  const { supported, toggle } = useFullscreen();
+
+  return (
+    <div className="rotate-gate" role="alertdialog" aria-modal="true" aria-label="Turn your phone sideways">
+      <span className="rotate-phone" aria-hidden="true"><Smartphone size={44} /></span>
+      <h2>Turn your phone sideways</h2>
+      <p>Blocks &amp; Tasks is played in landscape so the whole board fits on the screen.</p>
+      {supported && <button className="primary-button" onClick={toggle}><RotateCw size={19} /> Go landscape</button>}
+      <button className="text-button rotate-skip" onClick={onDismiss}>Play in portrait anyway</button>
+    </div>
+  );
 }
 
 type SoundEffect = 'step' | 'roll' | 'good' | 'bad' | 'portal' | 'mystery' | 'win';
@@ -289,6 +358,8 @@ function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMai
   const [eventDialog, setEventDialog] = useState<EventDialogState | null>(null);
   const [dareState, setDareState] = useState<DareState | null>(null);
   const [showRules, setShowRules] = useState(false);
+  const compact = useMediaQuery(COMPACT_QUERY);
+  const fullscreen = useFullscreen();
 
   useEffect(() => { gameRef.current = game; }, [game]);
   useEffect(() => {
@@ -500,17 +571,27 @@ function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMai
   };
 
   const winner = game.players.find((player) => player.id === game.winnerPlayerId);
+  const toggleSound = () => setGame((current) => ({ ...current, settings: { ...current.settings, soundEnabled: !current.settings.soundEnabled } }));
+
+  const hudButtons = (
+    <>
+      <button className="icon-button" onClick={toggleSound} aria-label={game.settings.soundEnabled ? 'Mute sounds' : 'Enable sounds'}>{game.settings.soundEnabled ? <Volume2 size={19} /> : <VolumeX size={19} />}</button>
+      <button className="icon-button" onClick={() => setShowRules(true)} aria-label="How to play"><CircleHelp size={19} /></button>
+      {fullscreen.supported && (
+        <button className="icon-button" onClick={fullscreen.toggle} aria-label={fullscreen.isFullscreen ? 'Leave fullscreen' : 'Play fullscreen'}>{fullscreen.isFullscreen ? <Minimize size={19} /> : <Maximize size={19} />}</button>
+      )}
+    </>
+  );
 
   return (
-    <main className="game-page">
-      <header className="game-header">
-        <button className="brand-button" onClick={onMainMenu} title="Main menu"><Footprints size={23} /><span>Blocks &amp; Tasks</span></button>
-        <div className="game-meta"><span>Turn {game.turnNumber}</span><span className="meta-divider" /><span>{game.settings.mode === 'ORIGINAL_SKETCH' ? 'Original sketch' : `Random ${game.seed}`}</span></div>
-        <div className="header-actions">
-          <button className="icon-button" onClick={() => setGame((current) => ({ ...current, settings: { ...current.settings, soundEnabled: !current.settings.soundEnabled } }))} aria-label={game.settings.soundEnabled ? 'Mute sounds' : 'Enable sounds'}>{game.settings.soundEnabled ? <Volume2 size={19} /> : <VolumeX size={19} />}</button>
-          <button className="icon-button" onClick={() => setShowRules(true)} aria-label="How to play"><CircleHelp size={19} /></button>
-        </div>
-      </header>
+    <main className={compact ? 'game-page compact' : 'game-page'}>
+      {!compact && (
+        <header className="game-header">
+          <button className="brand-button" onClick={onMainMenu} title="Main menu"><Footprints size={23} /><span>Blocks &amp; Tasks</span></button>
+          <div className="game-meta"><span>Turn {game.turnNumber}</span><span className="meta-divider" /><span>{game.settings.mode === 'ORIGINAL_SKETCH' ? 'Original sketch' : `Random ${game.seed}`}</span></div>
+          <div className="header-actions">{hudButtons}</div>
+        </header>
+      )}
 
       <section className="game-shell">
         <div className="board-column">
@@ -518,9 +599,16 @@ function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMai
         </div>
 
         <aside className="turn-panel">
+          {compact && (
+            <div className="hud-actions">
+              <button className="icon-button" onClick={onMainMenu} aria-label="Main menu"><Footprints size={19} /></button>
+              {hudButtons}
+            </div>
+          )}
+
           <div className="turn-owner">
             <span className="turn-pawn" style={{ '--pawn-color': activePlayer.color } as React.CSSProperties} />
-            <div><p>Current turn</p><h2>{activePlayer.name}</h2></div>
+            <div><p>{compact ? `Turn ${game.turnNumber}` : 'Current turn'}</p><h2>{activePlayer.name}</h2></div>
           </div>
 
           <div className={game.phase === 'MOVING' ? 'dice-stage rolling' : 'dice-stage'}>
@@ -600,10 +688,22 @@ function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMai
 
 export default function App() {
   const [activeGame, setActiveGame] = useState<GameState | null>(() => readSavedGame());
+  const portraitPhone = useMediaQuery(PORTRAIT_QUERY);
+  const [portraitAccepted, setPortraitAccepted] = useState(false);
+  const showRotateGate = portraitPhone && !portraitAccepted;
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   }, [activeGame?.id]);
+
+  useEffect(() => {
+    if (!portraitPhone) setPortraitAccepted(false);
+  }, [portraitPhone]);
+
+  useEffect(() => {
+    document.body.classList.toggle('rotate-locked', showRotateGate);
+    return () => document.body.classList.remove('rotate-locked');
+  }, [showRotateGate]);
 
   const startGame = (game: GameState) => {
     localStorage.removeItem(STORAGE_KEY);
@@ -615,9 +715,14 @@ export default function App() {
     setActiveGame(null);
   };
 
-  return activeGame ? (
-    <GameScreen key={activeGame.id} initialGame={activeGame} onMainMenu={mainMenu} />
-  ) : (
-    <SetupScreen onStart={startGame} />
+  return (
+    <>
+      {activeGame ? (
+        <GameScreen key={activeGame.id} initialGame={activeGame} onMainMenu={mainMenu} />
+      ) : (
+        <SetupScreen onStart={startGame} />
+      )}
+      {showRotateGate && <RotateGate onDismiss={() => setPortraitAccepted(true)} />}
+    </>
   );
 }

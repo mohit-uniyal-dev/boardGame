@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Blocks and Tasks">
+  <rect width="512" height="512" rx="96" fill="#118c7e"/>
+  <rect x="96" y="96" width="200" height="200" rx="36" fill="#fffefa" stroke="#24324a" stroke-width="16"/>
+  <rect x="216" y="216" width="200" height="200" rx="36" fill="#f6c945" stroke="#24324a" stroke-width="16"/>
+  <circle cx="196" cy="196" r="26" fill="#24324a"/>
+  <circle cx="276" cy="316" r="22" fill="#24324a"/>
+  <circle cx="356" cy="316" r="22" fill="#24324a"/>
+  <circle cx="316" cy="376" r="22" fill="#24324a"/>
+</svg>

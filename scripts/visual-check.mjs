@@ -32,7 +32,9 @@ async function inspect(viewport, label) {
     bodyWidth: document.body.scrollWidth,
     viewportWidth: document.documentElement.clientWidth,
     boardScrolls: (document.querySelector('.board-scroll')?.scrollWidth ?? 0) > (document.querySelector('.board-scroll')?.clientWidth ?? 0),
-    randomMode: document.querySelector('.game-meta')?.textContent?.includes('Random') ?? false,
+    compactHud: document.querySelector('.hud-actions') !== null,
+    boardFitsViewport: document.documentElement.scrollHeight <= document.documentElement.clientHeight,
+    randomMode: document.querySelector('.game-meta')?.textContent?.includes('Random') ?? 'hidden in compact HUD',
   }));
   await page.screenshot({ path: `test-results/${label}-game.png`, fullPage: true });
 
@@ -118,6 +120,7 @@ async function inspect(viewport, label) {
 const results = [];
 results.push(await inspect({ width: 1440, height: 1000 }, 'desktop'));
 results.push(await inspect({ width: 390, height: 844 }, 'mobile'));
+results.push(await inspect({ width: 844, height: 390 }, 'mobile-landscape'));
 console.log(JSON.stringify(results, null, 2));
 
 await browser.close();
