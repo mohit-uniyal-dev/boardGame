@@ -16,11 +16,12 @@ async function inspect(viewport, label) {
   const setupMetrics = await page.evaluate(() => ({
     bodyWidth: document.body.scrollWidth,
     viewportWidth: document.documentElement.clientWidth,
-    sketchLoaded: document.querySelector('.sketch-image-wrap img')?.complete ?? false,
-    visiblePlayerInputs: document.querySelectorAll('.player-field').length,
+    playerChoices: document.querySelectorAll('.home-player-select .segmented button').length,
+    primaryActions: document.querySelectorAll('.home-play-button').length,
+    drawingRemoved: document.querySelector('.sketch-image-wrap') === null,
   }));
 
-  await page.getByRole('button', { name: 'Start the race' }).click();
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
   await page.getByRole('button', { name: 'Roll dice' }).waitFor();
   const gameMetrics = await page.evaluate(() => ({
     tileCount: document.querySelectorAll('.tile').length,
@@ -28,6 +29,7 @@ async function inspect(viewport, label) {
     bodyWidth: document.body.scrollWidth,
     viewportWidth: document.documentElement.clientWidth,
     boardScrolls: (document.querySelector('.board-scroll')?.scrollWidth ?? 0) > (document.querySelector('.board-scroll')?.clientWidth ?? 0),
+    randomMode: document.querySelector('.game-meta')?.textContent?.includes('Random') ?? false,
   }));
   await page.screenshot({ path: `test-results/${label}-game.png`, fullPage: true });
 

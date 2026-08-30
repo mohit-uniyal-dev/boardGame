@@ -26,10 +26,9 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import sketchImage from '../docs/ImageReference.jpeg';
-import { DARES, MYSTERY_EFFECTS, PLAYER_COLORS } from './data';
+import { DARES, MYSTERY_EFFECTS } from './data';
 import { advanceTurn, createGame, createSeed } from './game';
-import type { BoardTile, Dare, GameMode, GameState, TileType } from './types';
+import type { BoardTile, Dare, GameState, TileType } from './types';
 
 const STORAGE_KEY = 'blocks-and-tasks-game-v1';
 const DICE_ICONS = [Dice1, Dice2, Dice3, Dice4, Dice5, Dice6];
@@ -127,126 +126,34 @@ function Modal({ children, onClose, label }: { children: React.ReactNode; onClos
   );
 }
 
-function SetupScreen({ savedGame, onStart, onResume }: { savedGame: GameState | null; onStart: (game: GameState) => void; onResume: () => void }) {
+function SetupScreen({ onStart }: { onStart: (game: GameState) => void }) {
   const [playerCount, setPlayerCount] = useState(2);
-  const [names, setNames] = useState(['Player 1', 'Player 2', 'Player 3', 'Player 4']);
-  const [mode, setMode] = useState<GameMode>('ORIGINAL_SKETCH');
-  const [physicalDares, setPhysicalDares] = useState(true);
-  const [sound, setSound] = useState(true);
-  const [showRules, setShowRules] = useState(false);
-
-  const setName = (index: number, value: string) => {
-    setNames((current) => current.map((name, nameIndex) => (nameIndex === index ? value : name)));
+  const startGame = () => {
+    const names = Array.from({ length: playerCount }, (_, index) => `Player ${index + 1}`);
+    onStart(createGame(names, 'RANDOM_PARTY', true, true));
   };
 
   return (
-    <main className="setup-page">
-      <header className="setup-header">
-        <div className="brand-mark"><Footprints size={28} /></div>
-        <div>
-          <p className="eyebrow">A hand-drawn party race</p>
-          <h1>Blocks &amp; Tasks</h1>
-        </div>
-        <button className="text-button rules-button" onClick={() => setShowRules(true)}>
-          <CircleHelp size={18} /> How to play
-        </button>
-      </header>
+    <main className="simple-home">
+      <section className="home-panel" aria-labelledby="game-title">
+        <div className="brand-mark home-brand"><Footprints size={35} /></div>
+        <p className="eyebrow">A party board game</p>
+        <h1 id="game-title">Blocks &amp; Tasks</h1>
+        <p className="home-subtitle">Pick your players and race to the finish.</p>
 
-      <div className="setup-layout">
-        <section className="setup-form" aria-labelledby="new-game-title">
-          <div className="section-heading">
-            <p className="step-label">New game</p>
-            <h2 id="new-game-title">Gather your players</h2>
-            <p>Pass one device around. First to reach tile 33 wins.</p>
-          </div>
-
-          {savedGame && !savedGame.winnerPlayerId && (
-            <button className="resume-banner" onClick={onResume}>
-              <span className="resume-icon"><Play size={18} fill="currentColor" /></span>
-              <span><strong>Resume turn {savedGame.turnNumber}</strong><small>{savedGame.players[savedGame.activePlayerIndex].name} is up next</small></span>
-              <ArrowLeft className="resume-arrow" size={18} />
-            </button>
-          )}
-
-          <fieldset>
-            <legend>Players</legend>
-            <div className="segmented" aria-label="Number of players">
-              {[2, 3, 4].map((count) => (
-                <button key={count} className={playerCount === count ? 'active' : ''} onClick={() => setPlayerCount(count)} type="button">{count}</button>
-              ))}
-            </div>
-          </fieldset>
-
-          <div className="player-inputs">
-            {names.slice(0, playerCount).map((name, index) => (
-              <label className="player-field" key={index}>
-                <span className="pawn-dot" style={{ '--pawn-color': PLAYER_COLORS[index] } as React.CSSProperties}>{index + 1}</span>
-                <span className="sr-only">Player {index + 1} name</span>
-                <input value={name} maxLength={16} onChange={(event) => setName(index, event.target.value)} />
-              </label>
+        <fieldset className="home-player-select">
+          <legend>How many players?</legend>
+          <div className="segmented" aria-label="Number of players">
+            {[2, 3, 4].map((count) => (
+              <button key={count} className={playerCount === count ? 'active' : ''} onClick={() => setPlayerCount(count)} type="button">{count}</button>
             ))}
           </div>
+        </fieldset>
 
-          <fieldset>
-            <legend>Board style</legend>
-            <div className="mode-options">
-              <button type="button" className={mode === 'ORIGINAL_SKETCH' ? 'mode-option selected' : 'mode-option'} onClick={() => setMode('ORIGINAL_SKETCH')}>
-                <span className="mode-icon paper"><Footprints size={20} /></span>
-                <span><strong>Original sketch</strong><small>The classic fixed route and surprises</small></span>
-                <span className="radio-mark">{mode === 'ORIGINAL_SKETCH' && <Check size={14} />}</span>
-              </button>
-              <button type="button" className={mode === 'RANDOM_PARTY' ? 'mode-option selected' : 'mode-option'} onClick={() => setMode('RANDOM_PARTY')}>
-                <span className="mode-icon random"><Shuffle size={20} /></span>
-                <span><strong>Random party</strong><small>Fresh, fair event tiles each match</small></span>
-                <span className="radio-mark">{mode === 'RANDOM_PARTY' && <Check size={14} />}</span>
-              </button>
-            </div>
-          </fieldset>
-
-          <div className="toggle-list">
-            <label className="toggle-row">
-              <span><strong>Physical dares</strong><small>Include balance and movement challenges</small></span>
-              <input type="checkbox" checked={physicalDares} onChange={(event) => setPhysicalDares(event.target.checked)} />
-              <span className="toggle" aria-hidden="true" />
-            </label>
-            <label className="toggle-row">
-              <span><strong>Game sounds</strong><small>Dice, movement and event cues</small></span>
-              <input type="checkbox" checked={sound} onChange={(event) => setSound(event.target.checked)} />
-              <span className="toggle" aria-hidden="true" />
-            </label>
-          </div>
-
-          <button className="primary-button start-button" onClick={() => onStart(createGame(names.slice(0, playerCount), mode, physicalDares, sound))}>
-            <Play size={19} fill="currentColor" /> Start the race
-          </button>
-        </section>
-
-        <aside className="sketch-panel">
-          <div className="sketch-image-wrap">
-            <img src={sketchImage} alt="The original hand-drawn board game sketch" />
-            <span className="tape tape-one" />
-            <span className="tape tape-two" />
-          </div>
-          <div className="sketch-caption">
-            <span className="caption-mark"><Star size={18} fill="currentColor" /></span>
-            <div><strong>Built from the original idea</strong><p>The winding path, tunnel, portal, blocks and finish-line dash all come from the paper version.</p></div>
-          </div>
-        </aside>
-      </div>
-
-      {showRules && (
-        <Modal onClose={() => setShowRules(false)} label="How to play">
-          <p className="modal-kicker">Quick rules</p>
-          <h2>Race, react, reach the finish</h2>
-          <div className="rule-list">
-            <div><span>1</span><p><strong>Roll and move</strong>Move your pawn the number shown. Only the tile you land on activates.</p></div>
-            <div><span>2</span><p><strong>Face the board</strong>Tunnels jump ahead, portals transport you, and blocks may hold you back.</p></div>
-            <div><span>3</span><p><strong>Take on tasks</strong>Complete short challenges. The other players judge pass or fail.</p></div>
-            <div><span>4</span><p><strong>Reach tile 33</strong>You do not need an exact roll. First across the finish line wins.</p></div>
-          </div>
-          <button className="primary-button" onClick={() => setShowRules(false)}>Got it</button>
-        </Modal>
-      )}
+        <button className="primary-button home-play-button" onClick={startGame}>
+          <Play size={23} fill="currentColor" /> Play
+        </button>
+      </section>
     </main>
   );
 }
@@ -680,24 +587,21 @@ function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMai
 }
 
 export default function App() {
-  const [savedGame, setSavedGame] = useState<GameState | null>(() => readSavedGame());
-  const [activeGame, setActiveGame] = useState<GameState | null>(null);
+  const [activeGame, setActiveGame] = useState<GameState | null>(() => readSavedGame());
 
   const startGame = (game: GameState) => {
     localStorage.removeItem(STORAGE_KEY);
-    setSavedGame(null);
     setActiveGame(game);
   };
 
   const mainMenu = () => {
-    const saved = readSavedGame();
-    setSavedGame(saved?.winnerPlayerId ? null : saved);
+    localStorage.removeItem(STORAGE_KEY);
     setActiveGame(null);
   };
 
   return activeGame ? (
     <GameScreen key={activeGame.id} initialGame={activeGame} onMainMenu={mainMenu} />
   ) : (
-    <SetupScreen savedGame={savedGame} onStart={startGame} onResume={() => savedGame && setActiveGame(savedGame)} />
+    <SetupScreen onStart={startGame} />
   );
 }
