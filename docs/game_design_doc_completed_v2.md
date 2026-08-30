@@ -203,25 +203,11 @@ When a player lands on `PARTY_DARE`, pause the main board and open a modal.
 ### Flow
 
 1. Draw a random challenge from the dare repository.
-2. Show title, instructions, timer, and clear success condition.
-3. Player clicks **Start Challenge**.
-4. Countdown begins.
-5. After completion, opponents choose **Passed** or **Failed**.
-6. Apply the configured success/failure result.
-7. Resume the game and end the turn unless the reward grants an extra roll.
+2. Show the task and **Completed? Yes / No** in one modal.
+3. Tapping either answer immediately applies the result and closes the modal.
+4. Resume the game and end the turn unless the reward grants an extra roll.
 
-### Voting Rule
-
-- **2 players:** the single opponent judges.
-- **3–4 players:** majority of non-active players decides.
-- A tie is treated as **Passed** to reduce griefing.
-- The active player does not vote on their own challenge.
-
-### Timer Rule
-
-- Timer expiry does not instantly move the pawn.
-- It changes the modal to **Time Up — Vote Result**.
-- Opponents still resolve Pass/Fail.
+The simplified kid UI does not use a separate start button, timer, voting screen, or result popup.
 
 ### MVP Failure Rule
 

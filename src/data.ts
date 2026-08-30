@@ -43,7 +43,7 @@ const originalEvents: Record<number, Partial<BoardTile> & { type: TileType }> = 
   7: { type: 'SHORTCUT_TUNNEL', label: 'Tunnel', targetTileId: 16 },
   8: { type: 'PARTY_DARE', label: 'Quick task', dareId: 'story' },
   9: { type: 'MYSTERY', label: 'Mystery' },
-  11: { type: 'CHOICE_TASK', label: 'Choose' },
+  11: { type: 'PARTY_DARE', label: 'Task', dareId: 'story' },
   12: { type: 'PENALTY_RESET', label: 'Back to start' },
   14: { type: 'PARTY_DARE', label: 'Memory', dareId: 'memory' },
   15: { type: 'PORTAL', label: 'Portal', targetTileId: 24 },
@@ -51,8 +51,8 @@ const originalEvents: Record<number, Partial<BoardTile> & { type: TileType }> = 
   18: { type: 'PARTY_DARE', label: 'Task', dareId: 'twister' },
   20: { type: 'GATE_RESTRICTION', label: 'Block', allowedDice: [1, 2] },
   22: { type: 'PARTY_DARE', label: 'No laugh', dareId: 'no-laugh' },
-  23: { type: 'CHOICE_TASK', label: 'Choose' },
-  25: { type: 'CHOICE_TASK', label: 'Choose' },
+  23: { type: 'PARTY_DARE', label: 'Task', dareId: 'no-laugh' },
+  25: { type: 'PARTY_DARE', label: 'Task', dareId: 'memory' },
   26: { type: 'PENALTY_SKIP', label: 'Skip a turn' },
   28: { type: 'EXTRA_ROLL', label: 'Roll again' },
   29: { type: 'PARTY_DARE', label: 'Fitness', dareId: 'jacks' },
@@ -129,8 +129,7 @@ export function createRandomBoard(seed: string): BoardTile[] {
   for (let count = 0; count < 10; count += 1) {
     const id = take();
     const dare = DARES[Math.floor(random() * DARES.length)];
-    const isChoice = count === 3 || count === 7;
-    set(id, { type: isChoice ? 'CHOICE_TASK' : 'PARTY_DARE', label: isChoice ? 'Choose' : 'Task', dareId: dare.id });
+    set(id, { type: 'PARTY_DARE', label: 'Task', dareId: dare.id });
   }
   return board;
 }

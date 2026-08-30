@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
 import {
-  ArrowLeft,
   Check,
   CircleHelp,
   Dice1,
@@ -32,7 +31,6 @@ import type { BoardTile, Dare, GameState, TileType } from './types';
 
 const STORAGE_KEY = 'blocks-and-tasks-game-v1';
 const DICE_ICONS = [Dice1, Dice2, Dice3, Dice4, Dice5, Dice6];
-const DARE_CATEGORY_LABELS = { PHYSICAL: 'Move', VERBAL: 'Talk', ACTING: 'Act', MEMORY: 'Remember' } as const;
 
 type Continuation = 'END_TURN' | 'BONUS_ROLL';
 type EventTone = 'good' | 'bad' | 'magic' | 'neutral';
@@ -46,9 +44,6 @@ interface EventDialogState {
 
 interface DareState {
   dare: Dare;
-  stage: 'intro' | 'timer' | 'vote';
-  secondsLeft: number;
-  votes: Record<string, boolean>;
 }
 
 const tileIcons: Partial<Record<TileType, ComponentType<{ size?: number; strokeWidth?: number }>>> = {
@@ -91,7 +86,7 @@ function getStepDuration() {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 40 : 190;
 }
 
-type SoundEffect = 'step' | 'roll' | 'good' | 'bad' | 'portal' | 'mystery' | 'tick' | 'win';
+type SoundEffect = 'step' | 'roll' | 'good' | 'bad' | 'portal' | 'mystery' | 'win';
 
 let sharedAudioContext: AudioContext | null = null;
 
@@ -159,9 +154,6 @@ function playSound(enabled: boolean, effect: SoundEffect) {
         break;
       case 'mystery':
         [740, 988, 1319, 988].forEach((frequency, index) => addTone(context, now + index * 0.075, frequency, 0.18, 0.055, 'sine'));
-        break;
-      case 'tick':
-        addTone(context, now, 880, 0.075, 0.055, 'square');
         break;
       case 'win':
         [523, 659, 784, 1047].forEach((frequency, index) => addTone(context, now + index * 0.13, frequency, index === 3 ? 0.48 : 0.24, 0.085, 'triangle'));
@@ -273,7 +265,6 @@ function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMai
   const [rollingValue, setRollingValue] = useState<number | null>(null);
   const [eventDialog, setEventDialog] = useState<EventDialogState | null>(null);
   const [dareState, setDareState] = useState<DareState | null>(null);
-  const [choiceActive, setChoiceActive] = useState(false);
   const [showRules, setShowRules] = useState(false);
 
   useEffect(() => { gameRef.current = game; }, [game]);
@@ -281,17 +272,6 @@ function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMai
     const normalized = { ...game, phase: game.winnerPlayerId ? 'GAME_OVER' : 'ROLL_PENDING', diceValue: null };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
   }, [game]);
-
-  useEffect(() => {
-    if (dareState?.stage !== 'timer') return;
-    if (dareState.secondsLeft <= 0) {
-      setDareState((current) => current ? { ...current, stage: 'vote' } : null);
-      return;
-    }
-    if (dareState.secondsLeft <= 5) playSound(gameRef.current.settings.soundEnabled, 'tick');
-    const timer = window.setTimeout(() => setDareState((current) => current ? { ...current, secondsLeft: current.secondsLeft - 1 } : null), 1000);
-    return () => window.clearTimeout(timer);
-  }, [dareState]);
 
   const activePlayer = game.players[game.activePlayerIndex];
   const DiceIcon = DICE_ICONS[(rollingValue ?? game.diceValue ?? 1) - 1];
@@ -329,7 +309,7 @@ function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMai
     setEventDialog({ title, detail, tone, continuation });
   };
 
-  const dismissEvent = () => {
+  const finishEvent = () => {
     const event = eventDialog;
     setEventDialog(null);
     if (!event) return;
@@ -340,6 +320,12 @@ function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMai
     }
   };
 
+  useEffect(() => {
+    if (!eventDialog) return;
+    const timer = window.setTimeout(finishEvent, 1800);
+    return () => window.clearTimeout(timer);
+  }, [eventDialog]);
+
   const pickDare = (tile: BoardTile) => {
     const eligible = DARES.filter((dare) => gameRef.current.settings.physicalDaresEnabled || dare.category !== 'PHYSICAL');
     const configured = eligible.find((dare) => dare.id === tile.dareId);
@@ -347,10 +333,9 @@ function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMai
   };
 
   const beginDare = (tile: BoardTile) => {
-    setChoiceActive(false);
     const dare = pickDare(tile);
     setGame((current) => ({ ...current, phase: 'DARE_ACTIVE', eventMessage: `${current.players[current.activePlayerIndex].name}'s task: ${dare.title}.` }));
-    setDareState({ dare, stage: 'intro', secondsLeft: dare.durationSeconds, votes: {} });
+    setDareState({ dare });
   };
 
   const resolveTile = (tile: BoardTile) => {
@@ -406,11 +391,8 @@ function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMai
         break;
       }
       case 'PARTY_DARE':
-        beginDare(tile);
-        break;
       case 'CHOICE_TASK':
-        setGame((state) => ({ ...state, phase: 'RESOLVING_EVENT', eventMessage: `${player.name} must choose.` }));
-        setChoiceActive(true);
+        beginDare(tile);
         break;
       case 'FINISH':
         declareWinner(33);
@@ -464,26 +446,18 @@ function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMai
 
   const resolveDare = (passed: boolean) => {
     if (!dareState) return;
-    const current = gameRef.current;
-    const player = current.players[current.activePlayerIndex];
-    const grantsRoll = passed && Boolean(dareState.dare.rewardExtraRoll) && current.bonusRollsUsedThisTurn < 2;
-    if (!passed) moveCurrentPlayer(player.currentTileId - dareState.dare.penaltySteps);
+    const dare = dareState.dare;
     setDareState(null);
-    showEvent(
-      passed ? 'You did it!' : 'Try again!',
-      passed ? (grantsRoll ? 'Great job! Roll again.' : 'Great job!') : `Move back ${dareState.dare.penaltySteps} spaces.`,
-      passed ? 'good' : 'bad',
-      grantsRoll ? 'BONUS_ROLL' : 'END_TURN',
-    );
-  };
-
-  const submitVotes = () => {
-    if (!dareState) return;
-    const opponents = game.players.filter((_, index) => index !== game.activePlayerIndex);
-    if (opponents.some((player) => dareState.votes[player.id] === undefined)) return;
-    const passed = opponents.filter((player) => dareState.votes[player.id]).length;
-    const failed = opponents.length - passed;
-    resolveDare(passed >= failed);
+    playSound(gameRef.current.settings.soundEnabled, passed ? 'good' : 'bad');
+    setGame((current) => {
+      const grantsRoll = passed && Boolean(dare.rewardExtraRoll) && current.bonusRollsUsedThisTurn < 2;
+      const players = passed ? current.players : current.players.map((player, index) => index === current.activePlayerIndex ? { ...player, currentTileId: Math.max(0, player.currentTileId - dare.penaltySteps) } : player);
+      const message = passed ? (grantsRoll ? 'Great job! Roll again.' : 'Great job!') : `Move back ${dare.penaltySteps} spaces.`;
+      const updated = { ...current, players, eventMessage: message };
+      if (grantsRoll) return { ...updated, phase: 'ROLL_PENDING' as const, diceValue: null, bonusRollsUsedThisTurn: current.bonusRollsUsedThisTurn + 1 };
+      const next = advanceTurn(updated);
+      return { ...next, eventMessage: `${message} ${next.eventMessage}` };
+    });
   };
 
   const rematch = (sameBoard: boolean) => {
@@ -541,64 +515,24 @@ function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMai
       </section>
 
       {eventDialog && (
-        <Modal label={eventDialog.title}>
-          <div className={`event-emblem ${eventDialog.tone}`}>{eventDialog.tone === 'bad' ? <RotateCcw size={30} /> : eventDialog.tone === 'magic' ? <Sparkles size={30} /> : <Star size={30} />}</div>
-          <h2>{eventDialog.title}</h2>
-          <p className="modal-detail">{eventDialog.detail}</p>
-          <button className="primary-button" onClick={dismissEvent}>{eventDialog.continuation === 'BONUS_ROLL' ? 'Roll' : 'OK'}</button>
-        </Modal>
-      )}
-
-      {choiceActive && (
-        <Modal label="Choose your task">
-          <div className="event-emblem magic"><Shuffle size={30} /></div>
-          <h2>Choose one</h2>
-          <p className="modal-detail">Do a task, or move back 2 spaces.</p>
-          <div className="choice-actions">
-            <button className="primary-button" onClick={() => beginDare(game.board[activePlayer.currentTileId])}><Star size={18} /> Do a task</button>
-            <button className="secondary-button" onClick={() => { setChoiceActive(false); moveCurrentPlayer(activePlayer.currentTileId - 2); showEvent('Move back', 'Move back 2 spaces.', 'neutral', 'END_TURN'); }}><ArrowLeft size={18} /> Move back 2</button>
-          </div>
-        </Modal>
+        <div className={`event-toast ${eventDialog.tone}`} role="status" aria-live="assertive">
+          <span className="event-toast-icon">{eventDialog.tone === 'bad' ? <RotateCcw size={22} /> : eventDialog.tone === 'magic' ? <Sparkles size={22} /> : <Star size={22} />}</span>
+          <div><strong>{eventDialog.title}</strong><p>{eventDialog.detail}</p></div>
+          <span className="event-toast-progress" aria-hidden="true" />
+        </div>
       )}
 
       {dareState && (
         <Modal label={dareState.dare.title}>
-          <div className="dare-topline"><span className={`category category-${dareState.dare.category.toLowerCase()}`}>{DARE_CATEGORY_LABELS[dareState.dare.category]}</span><span>{dareState.dare.durationSeconds} sec</span></div>
           <div className="event-emblem good"><Star size={30} /></div>
           <p className="modal-kicker">{activePlayer.name}'s task</p>
           <h2>{dareState.dare.title}</h2>
           <p className="modal-detail dare-detail">{dareState.dare.description}</p>
-
-          {dareState.stage === 'intro' && (
-            <div className="dare-actions">
-              <button className="primary-button" onClick={() => setDareState((current) => current ? { ...current, stage: 'timer' } : null)}><Play size={18} fill="currentColor" /> Start</button>
-              <button className="text-button danger-text" onClick={() => resolveDare(false)}>Skip task</button>
-            </div>
-          )}
-          {dareState.stage === 'timer' && (
-            <div className="timer-panel">
-              <div className="timer-value">{dareState.secondsLeft}</div>
-              <div className="timer-track"><span style={{ width: `${(dareState.secondsLeft / dareState.dare.durationSeconds) * 100}%` }} /></div>
-              <button className="secondary-button" onClick={() => setDareState((current) => current ? { ...current, stage: 'vote' } : null)}>Done</button>
-            </div>
-          )}
-          {dareState.stage === 'vote' && (
-            <div className="vote-panel">
-              <p className="vote-title">Did they do it?</p>
-              {game.players.map((player, index) => index === game.activePlayerIndex ? null : (
-                <div className="voter-row" key={player.id}>
-                  <span className="mini-pawn" style={{ '--pawn-color': player.color } as React.CSSProperties} />
-                  <strong>{player.name}</strong>
-                  <div className="vote-buttons">
-                    <button className={dareState.votes[player.id] === true ? 'pass selected' : 'pass'} onClick={() => setDareState((current) => current ? { ...current, votes: { ...current.votes, [player.id]: true } } : null)}><Check size={16} /> Yes</button>
-                    <button className={dareState.votes[player.id] === false ? 'fail selected' : 'fail'} onClick={() => setDareState((current) => current ? { ...current, votes: { ...current.votes, [player.id]: false } } : null)}><X size={16} /> No</button>
-                  </div>
-                </div>
-              ))}
-              <button className="primary-button" disabled={game.players.some((player, index) => index !== game.activePlayerIndex && dareState.votes[player.id] === undefined)} onClick={submitVotes}>See result</button>
-              <small className="tie-note">A tie means yes.</small>
-            </div>
-          )}
+          <p className="task-complete-label">Completed?</p>
+          <div className="task-result-buttons">
+            <button className="primary-button" onClick={() => resolveDare(true)}><Check size={20} /> Yes</button>
+            <button className="secondary-button" onClick={() => resolveDare(false)}><X size={20} /> No</button>
+          </div>
         </Modal>
       )}
 

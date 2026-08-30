@@ -37,13 +37,40 @@ async function inspect(viewport, label) {
   await page.evaluate(() => { Math.random = () => 0.5; });
   await page.getByRole('button', { name: 'Roll dice' }).click();
   const lockedDuringRoll = await page.getByRole('button', { name: /Moving|Resolving/ }).isDisabled();
-  await page.locator('.modal').waitFor();
+  await page.locator('.event-toast').waitFor();
   const pawnPosition = await page.locator('.event-log strong').textContent();
-  const startRuleText = await page.locator('.modal').evaluate((modal) => ({
-    title: modal.querySelector('h2')?.textContent,
-    detail: modal.querySelector('.modal-detail')?.textContent,
+  const startRuleText = await page.locator('.event-toast').evaluate((toast) => ({
+    title: toast.querySelector('strong')?.textContent,
+    detail: toast.querySelector('p')?.textContent,
+    hasButton: toast.querySelector('button') !== null,
   }));
   const startPawnCount = await page.locator('.tile-start .pawn').count();
+  await page.screenshot({ path: `test-results/${label}-start-notification.png`, fullPage: true });
+  await page.locator('.event-toast').waitFor({ state: 'detached' });
+  const startNotificationAutoClosed = await page.locator('.event-toast').count() === 0;
+
+  await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem('blocks-and-tasks-game-v1'));
+    state.activePlayerIndex = 0;
+    state.phase = 'ROLL_PENDING';
+    state.players = state.players.map((player, index) => ({ ...player, currentTileId: index === 0 ? 5 : 0, gateLock: null }));
+    state.board[6] = { ...state.board[6], type: 'PARTY_DARE', label: 'Task', dareId: 'robot' };
+    localStorage.setItem('blocks-and-tasks-game-v1', JSON.stringify(state));
+  });
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.evaluate(() => { Math.random = () => 0; });
+  await page.getByRole('button', { name: 'Roll dice' }).click();
+  await page.locator('.task-result-buttons').waitFor();
+  const taskPrompt = await page.locator('.modal').evaluate((modal) => ({
+    title: modal.querySelector('h2')?.textContent,
+    detail: modal.querySelector('.dare-detail')?.textContent,
+    question: modal.querySelector('.task-complete-label')?.textContent,
+    actions: [...modal.querySelectorAll('.task-result-buttons button')].map((button) => button.textContent?.trim()),
+  }));
+  await page.screenshot({ path: `test-results/${label}-task.png`, fullPage: true });
+  await page.getByRole('button', { name: 'Yes', exact: true }).click();
+  await page.locator('.modal').waitFor({ state: 'detached' });
+  const taskClosedAfterOneAnswer = await page.locator('.modal').count() === 0;
 
   await page.evaluate(() => {
     const state = JSON.parse(localStorage.getItem('blocks-and-tasks-game-v1'));
@@ -57,13 +84,15 @@ async function inspect(viewport, label) {
   await page.reload({ waitUntil: 'networkidle' });
   await page.evaluate(() => { Math.random = () => 0.9; });
   await page.getByRole('button', { name: 'Roll dice' }).click();
-  await page.locator('.modal').waitFor();
-  const kidEventText = await page.locator('.modal').evaluate((modal) => ({
-    title: modal.querySelector('h2')?.textContent,
-    detail: modal.querySelector('.modal-detail')?.textContent,
-    action: modal.querySelector('.primary-button')?.textContent?.trim(),
+  await page.locator('.event-toast').waitFor();
+  const kidEventText = await page.locator('.event-toast').evaluate((toast) => ({
+    title: toast.querySelector('strong')?.textContent,
+    detail: toast.querySelector('p')?.textContent,
+    hasButton: toast.querySelector('button') !== null,
   }));
   await page.screenshot({ path: `test-results/${label}-kid-event.png`, fullPage: true });
+  await page.locator('.event-toast').waitFor({ state: 'detached' });
+  const kidEventAutoClosed = await page.locator('.event-toast').count() === 0;
 
   await page.evaluate(() => {
     const state = JSON.parse(localStorage.getItem('blocks-and-tasks-game-v1'));
@@ -81,7 +110,7 @@ async function inspect(viewport, label) {
   await page.screenshot({ path: `test-results/${label}-victory.png`, fullPage: true });
 
   await page.close();
-  return { label, setupMetrics, gameMetrics, lockedDuringRoll, pawnPosition, startRuleText, startPawnCount, kidEventText, winPointsText };
+  return { label, setupMetrics, gameMetrics, lockedDuringRoll, pawnPosition, startRuleText, startPawnCount, startNotificationAutoClosed, taskPrompt, taskClosedAfterOneAnswer, kidEventText, kidEventAutoClosed, winPointsText };
 }
 
 const results = [];
