@@ -1,5 +1,5 @@
 import { createOriginalBoard, createRandomBoard, PLAYER_COLORS } from './data';
-import type { GameMode, GameState, Player } from './types';
+import type { Dare, GameMode, GameState, Player } from './types';
 
 export const WIN_POINTS = 1000;
 
@@ -11,12 +11,29 @@ export function canLeaveStart(diceValue: number) {
   return diceValue === 1 || diceValue === 6;
 }
 
+export function chooseDare(dares: Dare[], recentDareIds: string[], preferredId?: string, random = Math.random) {
+  let pool = dares.filter((dare) => !recentDareIds.includes(dare.id));
+  const startsNewCycle = pool.length === 0;
+  if (startsNewCycle) {
+    const lastDareId = recentDareIds.at(-1);
+    pool = dares.filter((dare) => dare.id !== lastDareId);
+    if (pool.length === 0) pool = dares;
+  }
+  const preferred = pool.find((dare) => dare.id === preferredId);
+  const dare = preferred ?? pool[Math.floor(random() * pool.length)];
+  return {
+    dare,
+    nextRecentDareIds: startsNewCycle ? [dare.id] : [...recentDareIds, dare.id],
+  };
+}
+
 export function createGame(names: string[], mode: GameMode, physicalDaresEnabled: boolean, soundEnabled: boolean, seed = createSeed()): GameState {
   const players: Player[] = names.map((name, index) => ({
     id: `player-${index + 1}-${Date.now()}`,
     name: name.trim() || `Player ${index + 1}`,
     color: PLAYER_COLORS[index],
     points: 0,
+    recentDareIds: [],
     currentTileId: 0,
     skipTurnsRemaining: 0,
     gateLock: null,

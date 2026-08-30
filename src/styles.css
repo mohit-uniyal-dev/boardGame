@@ -44,6 +44,7 @@ h2 { font-size: 1.8rem; line-height: 1.08; }
 .home-player-select .segmented button.active { background: var(--blue); }
 .home-play-button { width: 276px; min-height: 58px; font-size: 1.08rem; background: var(--red); }
 .home-play-button:hover:not(:disabled) { background: #d9483b; }
+.home-credit { max-width: 420px; margin-top: 34px; color: #71809a; font-size: .82rem; line-height: 1.45; }
 
 .setup-page { min-height: 100vh; padding: 28px clamp(20px, 5vw, 76px) 44px; background-color: #eef6ff; background-image: linear-gradient(90deg, rgba(39,126,232,.045) 1px, transparent 1px), linear-gradient(rgba(246,201,69,.055) 1px, transparent 1px); background-size: 32px 32px; }
 .setup-header { max-width: 1180px; margin: 0 auto 30px; display: flex; align-items: center; gap: 14px; }
@@ -136,7 +137,7 @@ legend { margin-bottom: 9px; font-size: .78rem; color: #4d5854; font-weight: 700
 .board::before { content: ''; position: absolute; inset: 0; background: linear-gradient(115deg, rgba(255,255,255,.35), transparent 45%); pointer-events: none; }
 .board-routes { position: absolute; inset: 2.2%; width: 95.6%; height: 95.6%; overflow: visible; pointer-events: none; }
 .path-line-shadow, .path-line { fill: none; stroke-linecap: round; stroke-linejoin: round; }
-.path-line-shadow { stroke: rgba(54,94,146,.2); stroke-width: 65; }
+.path-line-shadow { stroke: rgba(54,94,146,.14); stroke-width: 28; }
 .path-line { stroke: #8ba7cf; stroke-width: 8; stroke-dasharray: 5 13; }
 .transport-route { fill: none; stroke-width: 6; stroke-linecap: round; stroke-dasharray: 8 9; opacity: .65; }
 .tunnel-route { stroke: #ed7c2f; }

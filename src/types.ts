@@ -40,6 +40,7 @@ export interface Player {
   name: string;
   color: string;
   points: number;
+  recentDareIds: string[];
   currentTileId: number;
   skipTurnsRemaining: number;
   gateLock: number[] | null;

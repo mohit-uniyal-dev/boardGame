@@ -19,6 +19,7 @@ async function inspect(viewport, label) {
     playerChoices: document.querySelectorAll('.home-player-select .segmented button').length,
     primaryActions: document.querySelectorAll('.home-play-button').length,
     drawingRemoved: document.querySelector('.sketch-image-wrap') === null,
+    credit: document.querySelector('.home-credit')?.textContent,
   }));
 
   await page.getByRole('button', { name: 'Play', exact: true }).click();

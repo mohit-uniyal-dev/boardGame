@@ -2,7 +2,12 @@ import type { BoardTile, Dare, MysteryEffect, TileType } from './types';
 
 export const PLAYER_COLORS = ['#f25549', '#277ee8', '#f1af19', '#8a58d4'];
 
-// A fixed serpentine route: path order is independent of screen position.
+export interface PathCoordinate {
+  gridX: number;
+  gridY: number;
+}
+
+// The fixed route remains available for the original board configuration.
 export const PATH_COORDINATES = [
   ...Array.from({ length: 10 }, (_, x) => ({ gridX: x, gridY: 5 })),
   { gridX: 9, gridY: 4 },
@@ -15,6 +20,67 @@ export const PATH_COORDINATES = [
   { gridX: 5, gridY: 0 },
   { gridX: 4, gridY: 0 },
 ];
+
+const GRID_WIDTH = 10;
+const GRID_HEIGHT = 6;
+const RANDOM_PATH_LENGTH = 34;
+
+export function createRandomPathCoordinates(seed: string): PathCoordinate[] {
+  const directions = [
+    { x: 1, y: 0 },
+    { x: -1, y: 0 },
+    { x: 0, y: -1 },
+    { x: 0, y: 1 },
+  ];
+
+  for (let attempt = 0; attempt < 16; attempt += 1) {
+    const random = seededRandom(`${seed}-path-${attempt}`);
+    const path: PathCoordinate[] = [{ gridX: 0, gridY: GRID_HEIGHT - 1 }];
+    const visited = new Set(['0,5']);
+    let explored = 0;
+
+    const search = (): boolean => {
+      explored += 1;
+      if (explored > 20000) return false;
+      if (path.length === RANDOM_PATH_LENGTH) {
+        const end = path[path.length - 1];
+        return end.gridY <= 2 && Math.abs(end.gridX) + Math.abs(end.gridY - (GRID_HEIGHT - 1)) >= 7;
+      }
+
+      const current = path[path.length - 1];
+      const previous = path[path.length - 2];
+      const previousDirection = previous ? { x: current.gridX - previous.gridX, y: current.gridY - previous.gridY } : null;
+      const candidates = directions
+        .map((direction) => ({ gridX: current.gridX + direction.x, gridY: current.gridY + direction.y, direction }))
+        .filter(({ gridX, gridY }) => gridX >= 0 && gridX < GRID_WIDTH && gridY >= 0 && gridY < GRID_HEIGHT && !visited.has(`${gridX},${gridY}`))
+        .map((candidate) => {
+          const onwardMoves = directions.filter((direction) => {
+            const nextX = candidate.gridX + direction.x;
+            const nextY = candidate.gridY + direction.y;
+            return nextX >= 0 && nextX < GRID_WIDTH && nextY >= 0 && nextY < GRID_HEIGHT && !visited.has(`${nextX},${nextY}`);
+          }).length;
+          const continuesStraight = previousDirection?.x === candidate.direction.x && previousDirection?.y === candidate.direction.y;
+          return { ...candidate, score: random() - onwardMoves * 0.32 + candidate.gridY * 0.035 - (continuesStraight ? 0.18 : 0) };
+        })
+        .filter((candidate) => path.length === RANDOM_PATH_LENGTH - 1 || candidate.score < 10)
+        .sort((first, second) => first.score - second.score);
+
+      for (const candidate of candidates) {
+        const key = `${candidate.gridX},${candidate.gridY}`;
+        path.push({ gridX: candidate.gridX, gridY: candidate.gridY });
+        visited.add(key);
+        if (search()) return true;
+        path.pop();
+        visited.delete(key);
+      }
+      return false;
+    };
+
+    if (search()) return path;
+  }
+
+  return PATH_COORDINATES.map((coordinate) => ({ ...coordinate }));
+}
 
 export const DARES: Dare[] = [
   { id: 'balance', title: 'Balance', description: 'Stand on one leg.', durationSeconds: 20, category: 'PHYSICAL', penaltySteps: 2 },
@@ -60,8 +126,8 @@ const originalEvents: Record<number, Partial<BoardTile> & { type: TileType }> = 
   31: { type: 'PARTY_DARE', label: 'Last laugh', dareId: 'story' },
 };
 
-function createBaseBoard(): BoardTile[] {
-  return PATH_COORDINATES.map((coordinate, id) => ({
+function createBaseBoard(coordinates: PathCoordinate[] = PATH_COORDINATES): BoardTile[] {
+  return coordinates.map((coordinate, id) => ({
     id,
     ...coordinate,
     type: id === 0 ? 'START' : id === 33 ? 'FINISH' : 'NORMAL',
@@ -98,7 +164,7 @@ export function seededRandom(seed: string) {
 
 export function createRandomBoard(seed: string): BoardTile[] {
   const random = seededRandom(seed);
-  const board = createBaseBoard();
+  const board = createBaseBoard(createRandomPathCoordinates(seed));
   const available = Array.from({ length: 27 }, (_, index) => index + 4);
   const take = () => available.splice(Math.floor(random() * available.length), 1)[0];
   const takeWhere = (predicate: (id: number) => boolean) => {

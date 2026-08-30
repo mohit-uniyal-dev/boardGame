@@ -26,7 +26,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { DARES, MYSTERY_EFFECTS } from './data';
-import { advanceTurn, canLeaveStart, createGame, createSeed, WIN_POINTS } from './game';
+import { advanceTurn, canLeaveStart, chooseDare, createGame, createSeed, WIN_POINTS } from './game';
 import type { BoardTile, Dare, GameState, TileType } from './types';
 
 const STORAGE_KEY = 'blocks-and-tasks-game-v1';
@@ -68,7 +68,7 @@ function readSavedGame(): GameState | null {
     if (!saved.players?.length || saved.board?.length !== 34) return null;
     return {
       ...saved,
-      players: saved.players.map((player) => ({ ...player, points: player.points ?? 0 })),
+      players: saved.players.map((player) => ({ ...player, points: player.points ?? 0, recentDareIds: player.recentDareIds ?? [] })),
       phase: saved.winnerPlayerId ? 'GAME_OVER' : 'ROLL_PENDING',
       diceValue: null,
       eventMessage: saved.winnerPlayerId ? saved.eventMessage : `Game loaded. ${saved.players[saved.activePlayerIndex].name}'s turn.`,
@@ -206,6 +206,7 @@ function SetupScreen({ onStart }: { onStart: (game: GameState) => void }) {
         <button className="primary-button home-play-button" onClick={startGame}>
           <Play size={23} fill="currentColor" /> Play
         </button>
+        <p className="home-credit">A game idea by Krishna Baukhandi, made with ChatGPT and Mama Ji</p>
       </section>
     </main>
   );
@@ -328,13 +329,19 @@ function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMai
 
   const pickDare = (tile: BoardTile) => {
     const eligible = DARES.filter((dare) => gameRef.current.settings.physicalDaresEnabled || dare.category !== 'PHYSICAL');
-    const configured = eligible.find((dare) => dare.id === tile.dareId);
-    return configured ?? eligible[Math.floor(Math.random() * eligible.length)];
+    const player = gameRef.current.players[gameRef.current.activePlayerIndex];
+    return chooseDare(eligible, player.recentDareIds, tile.dareId);
   };
 
   const beginDare = (tile: BoardTile) => {
-    const dare = pickDare(tile);
-    setGame((current) => ({ ...current, phase: 'DARE_ACTIVE', eventMessage: `${current.players[current.activePlayerIndex].name}'s task: ${dare.title}.` }));
+    const selection = pickDare(tile);
+    const dare = selection.dare;
+    setGame((current) => ({
+      ...current,
+      players: current.players.map((player, index) => index === current.activePlayerIndex ? { ...player, recentDareIds: selection.nextRecentDareIds } : player),
+      phase: 'DARE_ACTIVE',
+      eventMessage: `${current.players[current.activePlayerIndex].name}'s task: ${dare.title}.`,
+    }));
     setDareState({ dare });
   };
 
@@ -460,11 +467,11 @@ function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMai
     });
   };
 
-  const rematch = (sameBoard: boolean) => {
+  const rematch = () => {
     const names = game.players.map((player) => player.name);
-    const seed = sameBoard ? game.seed : createSeed();
+    const seed = createSeed();
     const nextGame = createGame(names, game.settings.mode, game.settings.physicalDaresEnabled, game.settings.soundEnabled, seed);
-    nextGame.players = nextGame.players.map((player, index) => ({ ...player, points: game.players[index].points }));
+    nextGame.players = nextGame.players.map((player, index) => ({ ...player, points: game.players[index].points, recentDareIds: game.players[index].recentDareIds }));
     setEventDialog(null);
     setDareState(null);
     setGame(nextGame);
@@ -544,8 +551,7 @@ function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMai
           <div className="points-award"><Sparkles size={22} /><strong>+{WIN_POINTS.toLocaleString()} points</strong><span>Total: {winner.points.toLocaleString()}</span></div>
           <p className="modal-detail">You finished in {game.turnNumber} turns.</p>
           <div className="victory-actions">
-            <button className="primary-button" onClick={() => rematch(true)}><RotateCcw size={18} /> Same board</button>
-            <button className="secondary-button" onClick={() => rematch(false)}><Shuffle size={18} /> New board</button>
+            <button className="primary-button" onClick={rematch}><Shuffle size={18} /> Play again</button>
             <button className="text-button" onClick={onMainMenu}>Main menu</button>
           </div>
         </Modal>

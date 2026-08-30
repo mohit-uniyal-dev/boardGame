@@ -73,10 +73,11 @@ A fixed board intended to preserve the nephew's original concept.
 - Useful as the canonical/default board.
 
 ### 3.2 Random Party Mode
-Same visual path, but eligible special events are shuffled at match creation.
+The path geometry and eligible special events are generated at match creation.
 
-- Keeps the familiar board shape.
+- Creates a connected 34-block route with a different shape for each seed.
 - Increases replayability.
+- Reusing the same seed recreates the same layout.
 - Uses fairness constraints described later in this document.
 
 For MVP, either mode can ship first. The data model should support both without rewriting the board engine.
@@ -97,8 +98,8 @@ For MVP, either mode can ship first. The data model should support both without 
 | `PENALTY_SKIP` | Status Debuff | Player skips a configured number of future turns (MVP default: `1`). | Pause / frozen icon |
 | `PENALTY_RESET` | Major Setback | Sends the player directly to `START`. | Red reset / home arrow |
 | `GATE_RESTRICTION` | Conditional Block | Player becomes locked at this tile until they roll one of the allowed values. | Lock / barricade |
-| `PARTY_DARE` | Physical / Social Task | Opens a timed challenge modal. Success/failure determines the effect. | Star / challenge badge |
-| `CHOICE_TASK` | Player Choice | Presents 2–3 safe choices, e.g. perform a dare OR move back 2 spaces. | Fork / choice icon |
+| `PARTY_DARE` | Physical / Social Task | Opens one task prompt with **Completed? Yes / No**. | Star / challenge badge |
+| `CHOICE_TASK` | Reserved | Not generated in the simplified kid mode. | Fork / choice icon |
 
 ### Important distinction: Tunnel vs Portal
 
@@ -154,7 +155,16 @@ This mechanic represents the "block" idea in the sketch.
 
 ## 7. Dynamic Procedural Generation Logic
 
-The physical path coordinates should remain fixed. Only tile behavior is generated/shuffled in Random Party Mode.
+Random Party Mode generates both the physical path coordinates and tile behavior from the match seed.
+
+Path generation rules:
+
+- Tile `0` starts at the lower-left corner.
+- The route contains exactly `34` unique grid cells.
+- Consecutive path tiles must be orthogonally adjacent.
+- The finish must be in the upper half and a useful distance from Start.
+- A failed generation attempt retries with the same seed and a new attempt suffix.
+- Reusing a seed must reproduce the same route.
 
 ### Recommended Distribution Per Match
 
@@ -208,6 +218,8 @@ When a player lands on `PARTY_DARE`, pause the main board and open a modal.
 4. Resume the game and end the turn unless the reward grants an extra roll.
 
 The simplified kid UI does not use a separate start button, timer, voting screen, or result popup.
+
+Each player keeps an independent recent-task history. Show every eligible task before repeating one for that player, and never repeat their immediately previous task when a new cycle begins.
 
 ### MVP Failure Rule
 
@@ -492,7 +504,7 @@ Background
 
 - Recommended step duration: `180–300 ms` per tile.
 - Do not allow another dice roll during movement.
-- Special-event modal appears only after pawn animation finishes.
+- Informational events appear as short notifications after movement and continue automatically.
 
 ### Tunnel / Portal
 
@@ -537,22 +549,25 @@ Respect `prefers-reduced-motion` and replace long movement animations with short
 - Recent event message
 - Optional small turn-order panel
 
-### Screen D — Event Modal
+### Screen D — Event Feedback
 
-Used for:
+Use a short auto-closing notification for:
 
-- Dares
 - Mystery cards
 - Gate result
 - Portal/tunnel result
 - Reset penalty
 
+Use a modal only when input is required:
+
+- Task completion: **Yes / No**
+- Victory actions
+
 ### Screen E — Victory
 
 - Winner name/avatar
 - Number of turns
-- `Rematch — Same Board`
-- `Rematch — New Board`
+- `Play Again` — always generates a new seed and layout
 - `Main Menu`
 
 ---

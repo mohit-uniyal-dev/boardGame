@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createRandomBoard, DARES, MYSTERY_EFFECTS } from './data';
-import { advanceTurn, canLeaveStart, createGame, validateBoard, WIN_POINTS } from './game';
+import { advanceTurn, canLeaveStart, chooseDare, createGame, validateBoard, WIN_POINTS } from './game';
 
 describe('board game rules', () => {
   it('creates valid deterministic random boards', () => {
@@ -16,15 +16,20 @@ describe('board game rules', () => {
   });
 
   it('keeps 100 generated boards within the fairness constraints', () => {
+    const layouts = new Set<string>();
     for (let index = 0; index < 100; index += 1) {
       const board = createRandomBoard(`BOARD-${index}`);
+      layouts.add(board.map((tile) => `${tile.gridX},${tile.gridY}`).join('|'));
       expect(validateBoard({ board })).toBe(true);
+      expect(new Set(board.map((tile) => `${tile.gridX},${tile.gridY}`)).size).toBe(34);
+      expect(board.slice(1).every((tile, tileIndex) => Math.abs(tile.gridX - board[tileIndex].gridX) + Math.abs(tile.gridY - board[tileIndex].gridY) === 1)).toBe(true);
       const majorNegativeIds = board.filter((tile) => ['PENALTY_SKIP', 'PENALTY_RESET', 'GATE_RESTRICTION'].includes(tile.type)).map((tile) => tile.id);
       expect(majorNegativeIds.every((id) => majorNegativeIds.every((other) => id === other || Math.abs(id - other) > 1))).toBe(true);
       expect(board.filter((tile) => tile.type === 'SHORTCUT_TUNNEL')).toHaveLength(1);
       expect(board.filter((tile) => tile.type === 'PARTY_DARE' || tile.type === 'CHOICE_TASK')).toHaveLength(10);
       expect(board.filter((tile) => tile.type === 'MYSTERY')).toHaveLength(2);
     }
+    expect(layouts.size).toBeGreaterThan(90);
   });
 
   it('decrements skipped turns and selects the next available player', () => {
@@ -40,6 +45,7 @@ describe('board game rules', () => {
     expect(game.players).toHaveLength(4);
     expect(game.players.every((player) => player.currentTileId === 0)).toBe(true);
     expect(game.players.every((player) => player.points === 0)).toBe(true);
+    expect(game.players.every((player) => player.recentDareIds.length === 0)).toBe(true);
     expect(game.board.filter((tile) => tile.type === 'PARTY_DARE' || tile.type === 'CHOICE_TASK')).toHaveLength(12);
   });
 
@@ -54,5 +60,18 @@ describe('board game rules', () => {
 
   it('awards 1,000 points for a win', () => {
     expect(WIN_POINTS).toBe(1000);
+  });
+
+  it('shows every task before repeating one for the same player', () => {
+    let history: string[] = [];
+    const selected: string[] = [];
+    for (let index = 0; index < DARES.length; index += 1) {
+      const choice = chooseDare(DARES, history, undefined, () => 0);
+      selected.push(choice.dare.id);
+      history = choice.nextRecentDareIds;
+    }
+    expect(new Set(selected).size).toBe(DARES.length);
+    const nextChoice = chooseDare(DARES, history, selected.at(-1), () => 0);
+    expect(nextChoice.dare.id).not.toBe(selected.at(-1));
   });
 });
