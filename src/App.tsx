@@ -206,23 +206,6 @@ function Board({ game }: { game: GameState }) {
   );
 }
 
-function PlayerStrip({ game }: { game: GameState }) {
-  return (
-    <div className="player-strip" aria-label="Players">
-      {game.players.map((player, index) => (
-        <div className={index === game.activePlayerIndex ? 'player-chip active' : 'player-chip'} key={player.id}>
-          <span className="mini-pawn" style={{ '--pawn-color': player.color } as React.CSSProperties} />
-          <span className="player-copy"><strong>{player.name}</strong><small>Tile {player.currentTileId}</small></span>
-          <span className="statuses">
-            {player.skipTurnsRemaining > 0 && <span title="Skip turn"><Pause size={12} /> {player.skipTurnsRemaining}</span>}
-            {player.gateLock && <span title="Gate locked"><LockKeyhole size={12} /></span>}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMainMenu: () => void }) {
   const [game, setGame] = useState(initialGame);
   const gameRef = useRef(game);
@@ -460,7 +443,6 @@ function GameScreen({ initialGame, onMainMenu }: { initialGame: GameState; onMai
 
       <section className="game-shell">
         <div className="board-column">
-          <PlayerStrip game={game} />
           <Board game={game} />
         </div>
 

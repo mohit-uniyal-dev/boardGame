@@ -25,7 +25,8 @@ async function inspect(viewport, label) {
   await page.getByRole('button', { name: 'Roll dice' }).waitFor();
   const gameMetrics = await page.evaluate(() => ({
     tileCount: document.querySelectorAll('.tile').length,
-    playerCount: document.querySelectorAll('.player-chip').length,
+    playerCount: document.querySelectorAll('.pawn').length,
+    playerStripRemoved: document.querySelector('.player-strip') === null,
     bodyWidth: document.body.scrollWidth,
     viewportWidth: document.documentElement.clientWidth,
     boardScrolls: (document.querySelector('.board-scroll')?.scrollWidth ?? 0) > (document.querySelector('.board-scroll')?.clientWidth ?? 0),
@@ -36,7 +37,7 @@ async function inspect(viewport, label) {
   await page.getByRole('button', { name: 'Roll dice' }).click();
   const lockedDuringRoll = await page.getByRole('button', { name: /Moving|Resolving/ }).isDisabled();
   await page.waitForTimeout(2200);
-  const pawnPosition = await page.locator('.player-chip').first().locator('small').textContent();
+  const pawnPosition = await page.locator('.event-log strong').textContent();
 
   await page.close();
   return { label, setupMetrics, gameMetrics, lockedDuringRoll, pawnPosition };
