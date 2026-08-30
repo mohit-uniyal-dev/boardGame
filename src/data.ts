@@ -1,6 +1,6 @@
 import type { BoardTile, Dare, MysteryEffect, TileType } from './types';
 
-export const PLAYER_COLORS = ['#e24a3b', '#157d72', '#e6a51c', '#7357a6'];
+export const PLAYER_COLORS = ['#f25549', '#277ee8', '#f1af19', '#8a58d4'];
 
 // A fixed serpentine route: path order is independent of screen position.
 export const PATH_COORDINATES = [
@@ -39,16 +39,25 @@ export const MYSTERY_EFFECTS: MysteryEffect[] = [
 
 const originalEvents: Record<number, Partial<BoardTile> & { type: TileType }> = {
   4: { type: 'PARTY_DARE', label: 'Task', dareId: 'robot' },
+  5: { type: 'PARTY_DARE', label: 'Balance', dareId: 'balance' },
   7: { type: 'SHORTCUT_TUNNEL', label: 'Tunnel', targetTileId: 16 },
+  8: { type: 'PARTY_DARE', label: 'Quick task', dareId: 'story' },
   9: { type: 'MYSTERY', label: 'Mystery' },
+  11: { type: 'CHOICE_TASK', label: 'Choose' },
   12: { type: 'PENALTY_RESET', label: 'Back to start' },
+  14: { type: 'PARTY_DARE', label: 'Memory', dareId: 'memory' },
   15: { type: 'PORTAL', label: 'Portal', targetTileId: 24 },
+  17: { type: 'MYSTERY', label: 'Mystery' },
   18: { type: 'PARTY_DARE', label: 'Task', dareId: 'twister' },
   20: { type: 'GATE_RESTRICTION', label: 'Block', allowedDice: [1, 2] },
+  22: { type: 'PARTY_DARE', label: 'No laugh', dareId: 'no-laugh' },
   23: { type: 'CHOICE_TASK', label: 'Choose' },
+  25: { type: 'CHOICE_TASK', label: 'Choose' },
   26: { type: 'PENALTY_SKIP', label: 'Skip a turn' },
   28: { type: 'EXTRA_ROLL', label: 'Roll again' },
+  29: { type: 'PARTY_DARE', label: 'Fitness', dareId: 'jacks' },
   30: { type: 'PARTY_DARE', label: 'Final task', dareId: 'freeze' },
+  31: { type: 'PARTY_DARE', label: 'Last laugh', dareId: 'story' },
 };
 
 function createBaseBoard(): BoardTile[] {
@@ -117,10 +126,11 @@ export function createRandomBoard(seed: string): BoardTile[] {
   const reset = takeWhere((id) => id <= 27 && Math.abs(id - skip) > 1 && Math.abs(id - gate) > 1);
   set(reset, { type: 'PENALTY_RESET', label: 'Back to start' });
 
-  for (let count = 0; count < 4; count += 1) {
+  for (let count = 0; count < 10; count += 1) {
     const id = take();
     const dare = DARES[Math.floor(random() * DARES.length)];
-    set(id, { type: count === 3 ? 'CHOICE_TASK' : 'PARTY_DARE', label: count === 3 ? 'Choose' : 'Task', dareId: dare.id });
+    const isChoice = count === 3 || count === 7;
+    set(id, { type: isChoice ? 'CHOICE_TASK' : 'PARTY_DARE', label: isChoice ? 'Choose' : 'Task', dareId: dare.id });
   }
   return board;
 }

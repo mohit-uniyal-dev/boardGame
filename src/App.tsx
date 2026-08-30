@@ -278,7 +278,7 @@ function Board({ game }: { game: GameState }) {
           const playersHere = game.players.filter((player) => player.currentTileId === tile.id);
           return (
             <div
-              className={`tile tile-${tile.type.toLowerCase()}`}
+              className={`tile tile-${tile.type.toLowerCase()} tile-color-${tile.id % 5}`}
               style={{ gridColumn: tile.gridX + 1, gridRow: tile.gridY + 1 } as React.CSSProperties}
               key={tile.id}
               aria-label={`Tile ${tile.id}: ${tile.label}`}

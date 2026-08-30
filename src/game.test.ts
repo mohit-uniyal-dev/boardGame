@@ -22,7 +22,7 @@ describe('board game rules', () => {
       const majorNegativeIds = board.filter((tile) => ['PENALTY_SKIP', 'PENALTY_RESET', 'GATE_RESTRICTION'].includes(tile.type)).map((tile) => tile.id);
       expect(majorNegativeIds.every((id) => majorNegativeIds.every((other) => id === other || Math.abs(id - other) > 1))).toBe(true);
       expect(board.filter((tile) => tile.type === 'SHORTCUT_TUNNEL')).toHaveLength(1);
-      expect(board.filter((tile) => tile.type === 'PARTY_DARE' || tile.type === 'CHOICE_TASK')).toHaveLength(4);
+      expect(board.filter((tile) => tile.type === 'PARTY_DARE' || tile.type === 'CHOICE_TASK')).toHaveLength(10);
       expect(board.filter((tile) => tile.type === 'MYSTERY')).toHaveLength(2);
     }
   });
@@ -39,5 +39,6 @@ describe('board game rules', () => {
     const game = createGame(['A', 'B', 'C', 'D'], 'ORIGINAL_SKETCH', false, false, 'TEST');
     expect(game.players).toHaveLength(4);
     expect(game.players.every((player) => player.currentTileId === 0)).toBe(true);
+    expect(game.board.filter((tile) => tile.type === 'PARTY_DARE' || tile.type === 'CHOICE_TASK')).toHaveLength(12);
   });
 });
